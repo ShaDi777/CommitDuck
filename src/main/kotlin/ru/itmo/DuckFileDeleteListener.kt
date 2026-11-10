@@ -5,6 +5,7 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import ru.itmo.pet.Event
 
 /**
  * Reports files and directories deleted from the IDE to [DuckService].
@@ -20,7 +21,7 @@ class DuckFileDeleteListener : BulkFileListener {
                 projects.any { !it.isDisposed && ProjectFileIndex.getInstance(it).isInContent(event.file) }
         }
         if (deletedInProject) {
-            DuckService.getInstance().handle(PetEvent.Deleted)
+            DuckService.getInstance().handle(Event.Deleted)
         }
     }
 }

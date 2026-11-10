@@ -10,6 +10,7 @@ import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.CoroutineScope
+import ru.itmo.pet.PetStateType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.awt.Dimension
@@ -45,20 +46,20 @@ class DuckStatusBarWidget(private val scope: CoroutineScope) : CustomStatusBarWi
 }
 
 private class DuckComponent : JComponent() {
-    private val animations = PetState.entries.associateWith { DuckAnimation.load(it.animationName, "status") }
+    private val animations = PetStateType.entries.associateWith { DuckAnimation.load(it.animationName, "status") }
 
     // all states share one slot so the status bar doesn't shift when the duck changes state
     private val slotWidth = animations.values.maxOf { it.frameWidth }
     private val slotHeight = animations.values.maxOf { it.frameHeight }
 
-    private var animation = animations.getValue(PetState.IDLE)
+    private var animation = animations.getValue(PetStateType.IDLE)
     private var frame = 0
     private val timer = Timer(1000 / animation.fps) {
         frame = (frame + 1) % animation.frameCount
         repaint()
     }
 
-    var state: PetState = PetState.IDLE
+    var state: PetStateType = PetStateType.IDLE
         set(value) {
             if (field == value) return
             field = value
