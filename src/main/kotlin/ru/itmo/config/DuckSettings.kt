@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.config
 
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.Service

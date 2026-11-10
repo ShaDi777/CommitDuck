@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.ui
 
 import com.intellij.ui.scale.JBUIScale
 import java.awt.Graphics2D

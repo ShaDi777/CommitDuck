@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.service
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ru.itmo.config.DuckSettings
 import ru.itmo.pet.Event
 import ru.itmo.pet.PetModel
 import ru.itmo.pet.PetStateType

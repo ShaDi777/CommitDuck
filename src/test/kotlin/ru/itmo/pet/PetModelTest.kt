@@ -1,10 +1,7 @@
-package ru.itmo
+package ru.itmo.pet
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import ru.itmo.pet.Event
-import ru.itmo.pet.PetModel
-import ru.itmo.pet.PetStateType
 import ru.itmo.pet.states.IdleState
 
 class PetModelTest {

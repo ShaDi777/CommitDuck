@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.config
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.Nls

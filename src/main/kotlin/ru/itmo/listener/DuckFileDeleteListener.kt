@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.listener
 
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.roots.ProjectFileIndex
@@ -6,6 +6,7 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import ru.itmo.pet.Event
+import ru.itmo.service.DuckService
 
 /**
  * Reports files and directories deleted from the IDE to [DuckService].
