@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+    <product code="IC" name="IntelliJ IDEA Community Edition">
+        <channel id="IC-2026.1" name="2026.1">
+            <build number="261.24374.151" version="2026.1.2"/>
+        </channel>
+    </product>
+</products>

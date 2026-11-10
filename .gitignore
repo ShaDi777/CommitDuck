@@ -27,3 +27,12 @@ replay_pid*
 .kotlin/
 
 .idea/
+
+# Gradle
+.gradle/
+build/
+
+# IntelliJ Platform plugin
+out/
+captures/
+.intellijPlatform/

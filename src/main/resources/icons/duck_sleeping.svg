@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <ellipse cx="62" cy="92" rx="40" ry="26" fill="#ffd54f" stroke="#f0a820" stroke-width="3"/>
+  <path d="M24 88 q-10 -12 -6 -20 q13 2 12 16 z" fill="#f4c116"/>
+  <ellipse cx="66" cy="88" rx="20" ry="12" fill="#ffe082" stroke="#f0a820" stroke-width="2"/>
+  <circle cx="88" cy="46" r="24" fill="#ffd54f" stroke="#f0a820" stroke-width="3"/>
+  <path d="M108 44 q15 0 15 9 q0 9 -15 9 z" fill="#ff8a3d" stroke="#e0701f" stroke-width="2"/>
+  <path d="M60 116 q0 8 8 8 q8 0 8 -8" stroke="#ff8a3d" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- closed sleeping eyes -->
+  <path d="M88 42 q4 4 8 0 M96 42 q4 4 8 0" stroke="#2e2a25" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- zZz -->
+  <text x="112" y="18" font-family="sans-serif" font-weight="bold" font-size="14" fill="#3f51b5">Z</text>
+  <text x="124" y="10" font-family="sans-serif" font-weight="bold" font-size="10" fill="#7986cb">z</text>
+</svg>

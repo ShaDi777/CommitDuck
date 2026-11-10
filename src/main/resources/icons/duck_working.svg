@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <ellipse cx="62" cy="92" rx="40" ry="26" fill="#ffd54f" stroke="#f0a820" stroke-width="3"/>
+  <path d="M24 88 q-10 -12 -6 -20 q13 2 12 16 z" fill="#f4c116"/>
+  <ellipse cx="66" cy="88" rx="20" ry="12" fill="#ffe082" stroke="#f0a820" stroke-width="2"/>
+  <circle cx="88" cy="46" r="24" fill="#ffd54f" stroke="#f0a820" stroke-width="3"/>
+  <path d="M108 44 q15 0 15 9 q0 9 -15 9 z" fill="#ff8a3d" stroke="#e0701f" stroke-width="2"/>
+  <circle cx="94" cy="42" r="4.5" fill="#2e2a25"/>
+  <path d="M60 116 q0 8 8 8 q8 0 8 -8" stroke="#ff8a3d" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- programmer glasses -->
+  <path d="M86 38 h6 M96 38 h6" stroke="#2e2a25" stroke-width="3"/>
+  <rect x="92" y="34" width="10" height="8" rx="2" fill="none" stroke="#2e2a25" stroke-width="3"/>
+  <rect x="84" y="34" width="10" height="8" rx="2" fill="#bfe3ff" stroke="#2e2a25" stroke-width="3"/>
+  <!-- little laptop -->
+  <rect x="46" y="102" width="34" height="5" rx="2" fill="#5b6b7a"/>
+  <rect x="50" y="92" width="26" height="12" rx="2" fill="#33414f"/>
+</svg>

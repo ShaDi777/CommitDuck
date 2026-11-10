@@ -1,0 +1,24 @@
+<idea-plugin>
+    <id>com.commitduck</id>
+    <name>CommitDuck</name>
+    <vendor url="https://github.com/ShaDi777/CommitDuck">CommitDuck</vendor>
+
+    <description><![CDATA[
+        A virtual pet duck companion living right inside your JetBrains IDE.
+        The duck reacts to your activity, cheers for commits and finished tasks,
+        offers motivating phrases, and gets sleepy when you step away.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+                serviceImplementation="com.commitduck.persistence.PetPersistence"/>
+
+        <toolWindow
+                id="CommitDuck"
+                anchor="right"
+                icon="/icons/duckToolWindow.svg"
+                factoryClass="com.commitduck.ui.PetToolWindowFactory"/>
+    </extensions>
+</idea-plugin>

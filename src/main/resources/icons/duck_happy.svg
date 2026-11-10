@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <ellipse cx="62" cy="92" rx="40" ry="26" fill="#ffd54f" stroke="#f0a820" stroke-width="3"/>
+  <path d="M24 88 q-10 -12 -6 -20 q13 2 12 16 z" fill="#f4c116"/>
+  <ellipse cx="66" cy="88" rx="20" ry="12" fill="#ffe082" stroke="#f0a820" stroke-width="2"/>
+  <circle cx="88" cy="46" r="24" fill="#ffd54f" stroke="#f0a820" stroke-width="3"/>
+  <!-- open happy beak -->
+  <path d="M108 46 q15 0 15 8 q0 8 -15 8 z" fill="#ff8a3d" stroke="#e0701f" stroke-width="2"/>
+  <path d="M123 54 q-4 6 -15 6" stroke="#7a2c0a" stroke-width="2" fill="none"/>
+  <path d="M60 116 q0 8 8 8 q8 0 8 -8" stroke="#ff8a3d" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- happy eyes (^ ^) -->
+  <path d="M90 38 q2 -5 4 0 M98 38 q2 -5 4 0" stroke="#2e2a25" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- blush -->
+  <ellipse cx="80" cy="50" rx="4" ry="2.5" fill="#ffb3a0"/>
+  <!-- confetti -->
+  <rect x="118" y="20" width="5" height="5" fill="#e91e63" transform="rotate(20 120 22)"/>
+  <rect x="108" y="12" width="5" height="5" fill="#3f51b5" transform="rotate(-15 110 14)"/>
+  <rect x="126" y="34" width="5" height="5" fill="#4caf50" transform="rotate(40 128 36)"/>
+</svg>
