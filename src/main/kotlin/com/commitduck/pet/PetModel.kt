@@ -1,17 +1,16 @@
 package com.commitduck.pet
 
+import com.commitduck.pet.states.IdleState
+import com.commitduck.pet.states.PetState
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * The duck's state machine and observable state holder.
  *
- * - [handle] maps incoming [PetEvent]s to [PetState] transitions.
+ * - [handle] delegates incoming events to the current [PetState].
  * - [addListener] lets the UI subscribe and re-render whenever the state changes.
- *
- * The mapping is intentionally a pure, simple `when` so that adding new states
- * or events does not require changing the notification/persistence plumbing.
  */
-class PetModel(initialState: PetState = PetState.IDLE) {
+class PetModel(initialState: PetState = IdleState()) {
 
     var state: PetState = initialState
         private set
@@ -30,22 +29,11 @@ class PetModel(initialState: PetState = PetState.IDLE) {
      * Feeds an event into the state machine and, if the state actually changed,
      * notifies all listeners.
      */
-    fun handle(event: PetEvent) {
-        val target = transitionFor(event)
-        if (target != state) {
+    fun handle(event: Event) {
+        val target = state.handle(event)
+        if (target.type != state.type) {
             transitionTo(target)
         }
-    }
-
-    private fun transitionFor(event: PetEvent): PetState = when (event) {
-        is PetEvent.Activity -> PetState.WORKING
-        PetEvent.IdleStarted -> PetState.IDLE
-        PetEvent.IdleExtended -> PetState.SAD
-        PetEvent.Sleep -> PetState.SLEEPING
-        PetEvent.WakeUp -> PetState.WORKING
-        PetEvent.DuckClicked -> PetState.HAPPY
-        PetEvent.Commit -> PetState.HAPPY
-        is PetEvent.ThresholdReached -> PetState.HAPPY
     }
 
     private fun transitionTo(newState: PetState) {

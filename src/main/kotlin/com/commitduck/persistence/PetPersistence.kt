@@ -1,6 +1,6 @@
 package com.commitduck.persistence
 
-import com.commitduck.pet.PetState
+import com.commitduck.pet.PetStateType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
@@ -19,7 +19,7 @@ class PetPersistence : PersistentStateComponent<PetPersistence.State> {
 
     data class State(
         var typedCharacters: Long = 0L,
-        var lastPetState: String = PetState.IDLE.name,
+        var lastPetState: String = PetStateType.IDLE.name,
         var isAwake: Boolean = true,
     )
 
@@ -37,7 +37,7 @@ class PetPersistence : PersistentStateComponent<PetPersistence.State> {
         return myState.typedCharacters
     }
 
-    fun setPetState(state: PetState) {
+    fun setPetState(state: PetStateType) {
         myState.lastPetState = state.name
     }
 
