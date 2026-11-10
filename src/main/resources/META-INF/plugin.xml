@@ -24,6 +24,8 @@
         <errorHandler implementation="com.intellij.diagnostic.JetBrainsMarketplaceErrorReportSubmitter"/>
         <toolWindow id="MyToolWindow" factoryClass="ru.itmo.ui.MyToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+        <toolWindow id="Duck" factoryClass="ru.itmo.ui.DuckToolWindowFactory"
+                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
         <statusBarWidgetFactory id="CommitDuck" implementation="ru.itmo.ui.DuckStatusBarWidgetFactory"/>
         <applicationConfigurable parentId="tools" instance="ru.itmo.config.DuckConfigurable"
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
