@@ -1,6 +1,6 @@
 package com.commitduck.phrases
 
-import com.commitduck.pet.PetStateType
+import com.commitduck.pet.PetState
 import kotlin.random.Random
 
 /**
@@ -20,22 +20,22 @@ class MotivationPhrases(private val random: Random = Random.Default) {
     )
 
     private val byState = mapOf(
-        PetStateType.WORKING to listOf(
+        PetState.WORKING to listOf(
             "Look at you go — deep in flow!",
             "Type on, champion!",
         ),
-        PetStateType.HAPPY to listOf(
+        PetState.HAPPY to listOf(
             "Yay! That deserves a happy quack!",
             "Commit! I'm so proud of you!",
         ),
-        PetStateType.SAD to listOf(
+        PetState.SAD to listOf(
             "Hey, take a breath. I'm right here.",
             "Even the best days have slow parts. Coffee break?",
         ),
-        PetStateType.SLEEPING to listOf(
+        PetState.SLEEPING to listOf(
             "Zzz... I'll keep watch while you're away.",
         ),
-        PetStateType.IDLE to listOf(
+        PetState.IDLE to listOf(
             "Whenever you're ready, I'm here.",
         ),
     )
@@ -44,7 +44,7 @@ class MotivationPhrases(private val random: Random = Random.Default) {
     fun random(): String = general.random(random)
 
     /** Returns a random message suitable for the given state. */
-    fun forState(state: PetStateType): String {
+    fun forState(state: PetState): String {
         val pool = byState[state]
         return if (pool.isNullOrEmpty()) random() else pool.random(random)
     }

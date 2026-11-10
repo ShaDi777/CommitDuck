@@ -7,7 +7,7 @@ package com.commitduck.pet
  * (and optionally a corresponding image + phrase pool) without touching the
  * rest of the pet logic.
  */
-enum class PetStateType(val displayName: String) {
+enum class PetState(val displayName: String) {
     IDLE("Idle"),
     WORKING("Working"),
     HAPPY("Happy"),
