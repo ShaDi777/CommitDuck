@@ -31,3 +31,17 @@ replay_pid*
 
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
+
+# macOS
+.DS_Store
+
+# Python (tools/sticker_to_sprites.py)
+__pycache__/
+*.pyc
+
+# Machine-specific config
+local.properties
+.env
+
+# Keep the Gradle wrapper even though *.jar is ignored
+!gradle/wrapper/gradle-wrapper.jar
