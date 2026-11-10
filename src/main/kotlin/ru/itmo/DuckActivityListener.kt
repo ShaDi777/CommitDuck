@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.actionSystem.ex.AnActionListener
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
+import ru.itmo.pet.Event
 
 /** Edits that don't go through [afterEditorTyping] because they are actions, not typed characters. */
 private val EDITING_ACTIONS = setOf(
@@ -26,7 +27,7 @@ private val EDITING_ACTIONS = setOf(
 class DuckActivityListener : AnActionListener {
     override fun afterEditorTyping(c: Char, dataContext: DataContext) {
         if (isCodeEditor(CommonDataKeys.EDITOR.getData(dataContext))) {
-            DuckService.getInstance().handle(PetEvent.Typing)
+            DuckService.getInstance().handle(Event.Activity())
         }
     }
 
@@ -35,7 +36,7 @@ class DuckActivityListener : AnActionListener {
             event.actionManager.getId(action) in EDITING_ACTIONS &&
             isCodeEditor(event.getData(CommonDataKeys.EDITOR))
         ) {
-            DuckService.getInstance().handle(PetEvent.Typing)
+            DuckService.getInstance().handle(Event.Activity())
         }
     }
 

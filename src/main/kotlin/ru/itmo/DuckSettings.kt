@@ -10,8 +10,18 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.bindIntValue
 import com.intellij.ui.dsl.builder.panel
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+
+data class DuckTimeouts(
+    /** No activity for this long: [PetStateType.WORKING] -> [PetStateType.IDLE]. */
+    val idleAfter: Duration,
+    /** No activity for this long: any state -> [PetStateType.SLEEPING]. */
+    val sleepAfter: Duration,
+    /** How long the duck shows [PetStateType.DELETED] after the user deletes files. */
+    val deletedFor: Duration,
+)
 
 @Service(Service.Level.APP)
 @State(name = "CommitDuckSettings", storages = [Storage("commitDuck.xml")])
