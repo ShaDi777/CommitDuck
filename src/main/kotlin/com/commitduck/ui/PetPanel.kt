@@ -1,9 +1,9 @@
 package com.commitduck.ui
 
 import com.commitduck.persistence.PetPersistence
-import com.commitduck.pet.PetEvent
+import com.commitduck.pet.Event
 import com.commitduck.pet.PetModel
-import com.commitduck.pet.PetState
+import com.commitduck.pet.PetStateType
 import com.commitduck.phrases.MotivationPhrases
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -47,7 +47,7 @@ class PetPanel(
         imageLabel.toolTipText = "Click me for a pep talk!"
         imageLabel.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                model.handle(PetEvent.DuckClicked)
+                model.handle(Event.DuckClicked)
                 showMessage(phrases.random())
             }
         })
@@ -61,14 +61,14 @@ class PetPanel(
         render(model.state)
     }
 
-    private fun onPetStateChanged(state: PetState) {
+    private fun onPetStateChanged(state: PetStateType) {
         render(state)
-        if (state == PetState.HAPPY || state == PetState.SLEEPING) {
+        if (state == PetStateType.HAPPY || state == PetStateType.SLEEPING) {
             showMessage(phrases.forState(state))
         }
     }
 
-    private fun render(state: PetState) {
+    private fun render(state: PetStateType) {
         imageLabel.icon = PetIcons.iconFor(state)
         statusLabel.text = "Duck is ${state.displayName.lowercase()}"
         persistence.setPetState(state)
