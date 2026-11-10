@@ -1,5 +1,12 @@
 package com.commitduck.pet
 
+import com.commitduck.pet.states.HappyState
+import com.commitduck.pet.states.IdleState
+import com.commitduck.pet.states.PetState
+import com.commitduck.pet.states.SadState
+import com.commitduck.pet.states.SleepState
+import com.commitduck.pet.states.WorkingState
+
 /**
  * The discrete states a duck can be in.
  *
@@ -13,4 +20,12 @@ enum class PetStateType(val displayName: String) {
     HAPPY("Happy"),
     SAD("Sad"),
     SLEEPING("Sleeping"),
+}
+
+fun PetStateType.createState(): PetState = when (this) {
+    PetStateType.IDLE -> IdleState()
+    PetStateType.WORKING -> WorkingState()
+    PetStateType.HAPPY -> HappyState()
+    PetStateType.SAD -> SadState()
+    PetStateType.SLEEPING -> SleepState()
 }

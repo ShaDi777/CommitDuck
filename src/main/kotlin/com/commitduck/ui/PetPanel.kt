@@ -4,6 +4,7 @@ import com.commitduck.persistence.PetPersistence
 import com.commitduck.pet.Event
 import com.commitduck.pet.PetModel
 import com.commitduck.pet.PetStateType
+import com.commitduck.pet.states.PetState
 import com.commitduck.phrases.MotivationPhrases
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -27,7 +28,7 @@ class PetPanel(
 
     private val phrases = MotivationPhrases()
 
-    private val imageLabel = JBLabel(PetIcons.iconFor(model.state), SwingConstants.CENTER)
+    private val imageLabel = JBLabel(PetIcons.iconFor(model.state.type), SwingConstants.CENTER)
     private val statusLabel = JBLabel("", SwingConstants.CENTER)
     private val messageLabel = JBLabel("", SwingConstants.CENTER)
 
@@ -61,17 +62,17 @@ class PetPanel(
         render(model.state)
     }
 
-    private fun onPetStateChanged(state: PetStateType) {
+    private fun onPetStateChanged(state: PetState) {
         render(state)
-        if (state == PetStateType.HAPPY || state == PetStateType.SLEEPING) {
-            showMessage(phrases.forState(state))
+        if (state.type == PetStateType.HAPPY || state.type == PetStateType.SLEEPING) {
+            showMessage(phrases.forState(state.type))
         }
     }
 
-    private fun render(state: PetStateType) {
-        imageLabel.icon = PetIcons.iconFor(state)
+    private fun render(state: PetState) {
+        imageLabel.icon = PetIcons.iconFor(state.type)
         statusLabel.text = "Duck is ${state.displayName.lowercase()}"
-        persistence.setPetState(state)
+        persistence.setPetState(state.type)
     }
 
     private fun showMessage(text: String) {
