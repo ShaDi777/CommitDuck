@@ -42,6 +42,8 @@ class LocalDebugDuck(
     private val mainTopics = mutableListOf<DebugTopic>()
     private var lastKind: ReplyKind? = null
     private var lastAcknowledgement = ""
+    /** Error messages the duck has seen (from the IDE or pasted by the user), lowercase; picks the fitting hints. */
+    private val errorText = StringBuilder()
 
     fun greeting(): LocalReply = LocalReply(t(GREETINGS.random(random)), ReplyKind.GREETING)
 
@@ -53,7 +55,7 @@ class LocalDebugDuck(
             ?: problemReply(problems, mentionedTopics)
             ?: attachmentReply(attachment)
             ?: stuckReply(text)
-            ?: topicReply(mentionedTopics)
+            ?: topicReply(mentionedTopics, text)
             ?: phaseReply()
             ?: genericReply()
         lastKind = reply.kind
@@ -86,7 +88,22 @@ class LocalDebugDuck(
         val problemTopics = topicsOf(problems)
         val mentionedTopics = DebugTopic.entries.filter { it in problemTopics || it.matches(text) }
         if (mainTopics.isEmpty()) mainTopics += mentionedTopics
+
+        // once the duck has the error message, asking "what does the compiler say?" makes no sense
+        val errors = problems.map { (it.message + "\n" + it.details.orEmpty()).lowercase() } +
+            listOfNotNull(text.takeIf { QUOTED_ERROR.matches(it) })
+        if (errors.isNotEmpty()) {
+            errors.forEach { errorText.append(it).append('\n') }
+            asked += READ_THE_MESSAGE_HINTS
+        }
         return mentionedTopics
+    }
+
+    /** A hint for [topic]: one that fits the error text best (e.g. about for-each for "foreach not applicable"), or any. */
+    private fun hintFor(topic: DebugTopic, text: String): String? {
+        val context = "$text\n$errorText"
+        val specific = topic.specificHints.firstOrNull { (matcher, hint) -> hint !in asked && matcher.matches(context) }
+        return specific?.second?.also { asked += it } ?: pickUnasked(topic.hints)
     }
 
     /** A congratulation in the current language, e.g. when the user marks the problem as solved. */
@@ -99,6 +116,7 @@ class LocalDebugDuck(
         mainTopics.clear()
         lastKind = null
         lastAcknowledgement = ""
+        errorText.clear()
     }
 
     private fun solvedReply(text: String): LocalReply? = if (isSolved(text)) congratulate() else null
@@ -139,7 +157,7 @@ class LocalDebugDuck(
         }
         // new information from the IDE beats the alternation of hints and checklist questions
         for (topic in mentionedTopics) {
-            val hint = pickUnasked(topic.hints) ?: continue
+            val hint = hintFor(topic, problem.message.lowercase()) ?: continue
             return LocalReply("$quote$more ${t(hint)}", ReplyKind.PROBLEM, topic)
         }
         val question = phaseReply(acknowledge = false)?.text ?: genericReply(acknowledge = false).text
@@ -153,7 +171,10 @@ class LocalDebugDuck(
             val template = pickUnasked(FILE_QUESTIONS) ?: return null
             return LocalReply(t(template).replace("{file}", attachment.fileName), ReplyKind.FILE)
         }
-        val template = pickUnasked(CODE_QUESTIONS) ?: return null
+        // for a compile error, questions about types and calls fit better than "which value is wrong?"
+        val template = (if (DebugTopic.COMPILE_ERROR in mainTopics) pickUnasked(COMPILE_CODE_QUESTIONS) else null)
+            ?: pickUnasked(CODE_QUESTIONS)
+            ?: return null
         val text = t(template)
             .replace("{file}", attachment.fileName)
             .replace("{lines}", linesText(attachment.lineCount, language))
@@ -165,13 +186,14 @@ class LocalDebugDuck(
         return LocalReply(t(pickCycling(STUCK_REPLIES)), ReplyKind.STUCK)
     }
 
-    private fun topicReply(mentionedTopics: List<DebugTopic>): LocalReply? {
-        // alternate topic hints with checklist questions, so keywords don't take over the conversation
-        if (lastKind == ReplyKind.TOPIC) return null
+    private fun topicReply(mentionedTopics: List<DebugTopic>, text: String): LocalReply? {
+        // alternate topic hints with checklist questions, so keywords don't take over the conversation;
+        // a pasted error message is new information though, and deserves a hint of its own
+        if (lastKind == ReplyKind.TOPIC && !QUOTED_ERROR.matches(text)) return null
         // without keywords in this message, come back to the main problem: "yes, they behave" after "I have a compile
         // error" is still about the compile error, not about "the loop in line 13" mentioned in passing
         for (topic in mentionedTopics.ifEmpty { mainTopics }) {
-            val hint = pickUnasked(topic.hints) ?: continue
+            val hint = hintFor(topic, text) ?: continue
             return LocalReply(acknowledge() + t(hint), ReplyKind.TOPIC, topic)
         }
         return null
@@ -224,11 +246,32 @@ class LocalDebugDuck(
         /** Every phrase the duck can say, in English; used to check the translations. */
         fun allPhrases(): List<String> =
             GREETINGS + ACKNOWLEDGEMENTS.filter { it.isNotEmpty() } + SOLVED_REPLIES + THANKS_REPLIES + CODE_QUESTIONS +
+                COMPILE_CODE_QUESTIONS + DebugTopic.entries.flatMap { topic -> topic.specificHints.map { it.second } } +
                 FILE_QUESTIONS + STUCK_REPLIES + GENERIC_QUESTIONS +
                 DebugPhase.entries.flatMap { it.questions } + DebugTopic.entries.flatMap { it.hints }
 
         val WHITESPACE = Regex("\\s+")
         const val MAX_QUOTE_LENGTH = 160
+
+        /** Text that looks like a pasted error message rather than the user's own words. */
+        val QUOTED_ERROR = KeywordMatcher(
+            prefixes = listOf(
+                "not applicable to", "incompatible types", "cannot find symbol", "cannot resolve", "unresolved reference",
+                "type mismatch", "cannot be applied", "cannot be converted", "' expected", "expected:<", "exception in thread",
+                "caused by:", "error:",
+            ),
+        )
+
+        /** Hints that ask the user to read the error message out: pointless once the duck has the message. */
+        val READ_THE_MESSAGE_HINTS = setOf(
+            "What exactly does the compiler say? Read the message word by word: which symbol, type or token does it complain about?",
+            "What does the error message say, word by word? Find the first stack trace frame from your own code - which line is it?",
+        )
+
+        val COMPILE_CODE_QUESTIONS = listOf(
+            "Here are {lines} from {file}. Go through the line the compiler points to: what type does each expression there have, and what type does the code around it expect?",
+            "I see {lines} from {file}. Which call or expression here are you least sure about: does it return what you think, and does that fit where it is used?",
+        )
 
         /** Topics suggested by IDE problems: compile errors for code and build errors, tests for test failures, plus
          *  whatever the error text itself mentions (a `NullPointerException` in a failed test is a null problem). */
@@ -414,6 +457,8 @@ enum class DebugTopic(
     val hints: List<String>,
     /** Checklist steps that make no sense for this kind of problem, e.g. "Can you reproduce it?" for a compile error. */
     val irrelevantPhases: Set<DebugPhase> = emptySet(),
+    /** Hints that fit a particular error text, tried before [hints], most specific first. */
+    val specificHints: List<Pair<KeywordMatcher, String>> = emptyList(),
 ) {
     COMPILE_ERROR(
         KeywordMatcher(
@@ -431,6 +476,21 @@ enum class DebugTopic(
             "Do the types fit? Check what each expression on that line returns and what is expected there, and whether everything it uses is declared and imported.",
         ),
         irrelevantPhases = setOf(DebugPhase.EXPECTED_VS_ACTUAL, DebugPhase.REPRODUCE),
+        specificHints = listOf(
+            KeywordMatcher(prefixes = listOf("foreach not applicable", "for-each not applicable", "for-each loop", "not iterable")) to
+                "A for-each loop only works with arrays and Iterable. Is the expression after the colon one of them? A stream, for example, is neither.",
+            KeywordMatcher(prefixes = listOf("cannot find symbol", "cannot resolve", "unresolved reference", "is not defined")) to
+                "Is everything on that line declared and visible at that point: spelled the same way, imported, and in scope?",
+            KeywordMatcher(prefixes = listOf("' expected", "illegal start", "unclosed", "reached end of file", "expecting")) to
+                "Look at the line just before the one the compiler points to. A missing semicolon, bracket or quote often shows up a line later.",
+            KeywordMatcher(
+                prefixes = listOf(
+                    "not applicable", "incompatible types", "type mismatch", "cannot be applied", "cannot be converted",
+                    "required:", "inferred type",
+                ),
+            ) to
+                "Do the types fit? Check what each expression on that line returns and what is expected there, and whether everything it uses is declared and imported.",
+        ),
     ),
     NULL_VALUE(
         KeywordMatcher(

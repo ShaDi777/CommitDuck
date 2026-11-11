@@ -111,6 +111,26 @@ class LocalDebugDuckTest {
     }
 
     @Test
+    fun `helps with a pasted compiler message instead of asking for it`() {
+        val foreachHint = DebugTopic.COMPILE_ERROR.specificHints.first().second
+        assertEquals(DebugTopic.COMPILE_ERROR, duck.reply("i have compilation errors in selected lines").topic)
+        val reply = duck.reply("Foreach not applicable to type 'java.util.stream.IntStream'")
+        assertTrue(reply.text, reply.text.endsWith(foreachHint))
+        val code = CodeAttachment.of("Main.java", "JAVA", "for (var i : IntStream.range(1, 2).sorted()) {\n    System.out.println(i);\n}", 7)
+        val codeReply = duck.reply("i have select problem code, please view it", code)
+        assertEquals(ReplyKind.CODE, codeReply.kind)
+        assertTrue(codeReply.text, "compiler" in codeReply.text || "call or expression" in codeReply.text)
+    }
+
+    @Test
+    fun `picks the hint that fits the IDE error`() {
+        val reply = duck.reply("why?", problems = listOf(IdeProblem(ProblemKind.CODE, "Cannot resolve symbol 'foo'", "A.java:3")))
+        assertTrue(reply.text, reply.text.endsWith("Is everything on that line declared and visible at that point: spelled the same way, imported, and in scope?"))
+        val next = List(6) { duck.reply("hmm").text }
+        assertTrue(next.joinToString("\n"), next.none { it.endsWith(LocalDebugDuck.READ_THE_MESSAGE_HINTS.first()) })
+    }
+
+    @Test
     fun `short keywords match whole words only`() {
         assertTrue(DebugTopic.USER_INTERFACE.matches("the ui is broken"))
         assertFalse(DebugTopic.USER_INTERFACE.matches("the build is broken"))

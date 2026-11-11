@@ -178,5 +178,13 @@ internal object RussianPhrases {
         "Interesting. " to "Интересно. ",
         "Quack. " to "Кря. ",
         "Okay. " to "Хорошо. ",
+        "A for-each loop only works with arrays and Iterable. Is the expression after the colon one of them? A stream, for example, is neither." to
+            "Цикл for-each работает только с массивами и Iterable. Выражение после двоеточия — одно из них? Поток (Stream), например, — ни то ни другое.",
+        "Is everything on that line declared and visible at that point: spelled the same way, imported, and in scope?" to
+            "Всё ли в этой строке объявлено и видно в этом месте: написано так же, импортировано и находится в области видимости?",
+        "Here are {lines} from {file}. Go through the line the compiler points to: what type does each expression there have, and what type does the code around it expect?" to
+            "Вот {lines} из {file}. Пройдись по строке, на которую указывает компилятор: какой тип у каждого выражения в ней и какой тип ожидает код вокруг?",
+        "I see {lines} from {file}. Which call or expression here are you least sure about: does it return what you think, and does that fit where it is used?" to
+            "Передо мной {lines} из {file}. В каком вызове или выражении здесь ты уверен меньше всего: возвращает ли оно то, что ты думаешь, и подходит ли это туда, где используется?",
     )
 }
