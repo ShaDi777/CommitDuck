@@ -98,6 +98,13 @@ class DuckService(scope: CoroutineScope) {
 
                 PetStateType.SLEEPING -> Unit
 
+                // the greeting is a short reaction too: without it the duck would greet until the user types
+                PetStateType.GREETING, PetStateType.FIRST_LAUNCH -> {
+                    if (quietFor >= GREETING_DURATION) {
+                        model.handle(Event.WakeUp)
+                    }
+                }
+
                 PetStateType.SAD -> {
                     if (quietFor >= timeouts.sleepAfter) {
                         model.handle(Event.Sleep)
@@ -144,7 +151,7 @@ class DuckService(scope: CoroutineScope) {
                     now + timeouts.deletedFor.inWholeMilliseconds
             }
 
-            Event.BuildSucceeded, Event.TestsPassed, Event.Commit -> {
+            Event.BuildSucceeded, Event.TestsPassed, Event.Commit, Event.ProblemSolved -> {
                 lastActivityMillis = now
                 happyUntilMillis =
                     now + timeouts.happyFor.inWholeMilliseconds
@@ -159,6 +166,9 @@ class DuckService(scope: CoroutineScope) {
     }
 
     companion object {
+        /** How long the greeting (and the first-launch welcome) is shown if the user doesn't start typing. */
+        private val GREETING_DURATION = 4.seconds
+
         private val CHECK_INTERVAL = 1.seconds
 
         fun getInstance(): DuckService = service()
