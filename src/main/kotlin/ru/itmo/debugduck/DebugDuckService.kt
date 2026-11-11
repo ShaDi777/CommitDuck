@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
@@ -35,6 +36,8 @@ data class DebugDuckState(
     val conversationId: Int = 0,
     /** Code and errors picked with "Ask Debug Duck", sent with the next message. */
     val pending: PendingContext? = null,
+    /** The part of the language model's answer received so far, while [thinking]. */
+    val partialAnswer: String? = null,
 )
 
 /**
@@ -84,9 +87,10 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
         val newState = mutableState.updateAndGet {
             it.copy(messages = it.messages + message, thinking = true, pending = null)
         }
+        val conversationId = newState.conversationId
         answerJob = scope.launch {
             val answer = try {
-                answer(newState.messages, message)
+                answer(newState.messages, message, conversationId)
             }
             catch (e: CancellationException) {
                 throw e
@@ -96,11 +100,25 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
                 listOf(ChatMessage(ChatRole.NOTICE, MyMessageBundle.message("debugduck.error.unexpected")), localAnswer(message))
             }
             mutableState.update {
-                if (it.conversationId != newState.conversationId) it
-                else it.copy(messages = it.messages + answer, thinking = false)
+                // a stopped answer or one from an older conversation is dropped
+                if (it.conversationId != conversationId || !it.thinking) it
+                else it.copy(messages = it.messages + answer, thinking = false, partialAnswer = null)
             }
         }
         return true
+    }
+
+    /** Stops the answer in progress; what the language model has written so far stays in the chat. */
+    fun stop() {
+        val before = mutableState.getAndUpdate { state ->
+            if (!state.thinking) return@getAndUpdate state
+            val partial = state.partialAnswer?.takeIf { it.isNotBlank() }?.let {
+                ChatMessage(ChatRole.DUCK, it, model = DuckSettings.getInstance().llmConfig(null).model.trim())
+            }
+            val notice = ChatMessage(ChatRole.NOTICE, MyMessageBundle.message("debugduck.stopped"))
+            state.copy(messages = state.messages + listOfNotNull(partial, notice), thinking = false, partialAnswer = null)
+        }
+        if (before.thinking) answerJob?.cancel()
     }
 
     /** Forgets the conversation (cancelling an answer in progress) and greets the user again. */
@@ -123,7 +141,7 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
             }
         }
 
-    private suspend fun answer(history: List<ChatMessage>, message: ChatMessage): List<ChatMessage> {
+    private suspend fun answer(history: List<ChatMessage>, message: ChatMessage, conversationId: Int): List<ChatMessage> {
         val settings = DuckSettings.getInstance()
         if (!settings.isLlmEnabled) {
             // a short pause, so the duck seems to think about the question instead of firing it back instantly
@@ -133,8 +151,18 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
 
         val config = settings.llmConfig(DebugDuckCredentials.getInstance().apiKey())
         return try {
+            var lastShown = 0L
             val text = runInterruptible(Dispatchers.IO) {
-                llmClient.complete(config, DebugDuckPrompt.buildMessages(history, settings.fixedDuckLanguage))
+                llmClient.complete(config, DebugDuckPrompt.buildMessages(history, settings.fixedDuckLanguage)) { partial ->
+                    // the chat is re-rendered on every update, a few times a second is plenty
+                    val now = System.currentTimeMillis()
+                    if (now - lastShown >= PARTIAL_UPDATE_MILLIS) {
+                        lastShown = now
+                        mutableState.update {
+                            if (it.conversationId != conversationId || !it.thinking) it else it.copy(partialAnswer = partial)
+                        }
+                    }
+                }
             }
             listOf(ChatMessage(ChatRole.DUCK, text, model = config.model.trim()))
         }
@@ -163,6 +191,7 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
 
     companion object {
         private val LOG = logger<DebugDuckService>()
+        private const val PARTIAL_UPDATE_MILLIS = 120L
 
         fun getInstance(project: Project): DebugDuckService = project.service()
     }

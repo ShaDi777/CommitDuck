@@ -30,6 +30,12 @@ object DebugDuckPrompt {
         - If the message is not about software development, gently steer the conversation back to the problem.
     """.trimIndent()
 
+    /** A tiny request for "Test Connection" in the settings. */
+    val CONNECTION_TEST = listOf(
+        LlmMessage(LlmMessage.SYSTEM, "This is a connection test. Reply with the single word OK."),
+        LlmMessage(LlmMessage.USER, "ping"),
+    )
+
     /** @param language always answer in this language; `null` to answer in the language the user writes in */
     fun buildMessages(history: List<ChatMessage>, language: DuckLanguage? = null): List<LlmMessage> {
         val conversation = history

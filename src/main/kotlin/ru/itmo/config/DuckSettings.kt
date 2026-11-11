@@ -16,9 +16,19 @@ import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.bindItem
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.ThrowableComputable
+import com.intellij.ui.JBIntSpinner
+import com.intellij.ui.components.JBPasswordField
+import com.intellij.ui.components.JBTextField
+import com.intellij.ui.dsl.builder.Cell
 import ru.itmo.debugduck.DebugDuckCredentials
+import ru.itmo.debugduck.DebugDuckPrompt
 import ru.itmo.debugduck.DuckLanguage
 import ru.itmo.debugduck.LlmConfig
+import ru.itmo.debugduck.LlmException
+import ru.itmo.debugduck.OpenAiCompatibleClient
 import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -68,6 +78,8 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         /** Debug Duck: send errors from the editor, the last build and the last test run along with messages. */
         var shareIdeProblems by property(true)
         var duckLanguage by enum(DuckLanguageSetting.AUTO)
+        /** The user agreed that messages, code and errors are sent to a remote language model. */
+        var llmPrivacyAccepted by property(false)
     }
 
     fun timeouts() = DuckTimeouts(
@@ -116,6 +128,12 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
 
 /** Settings | Tools | Commit Duck */
 class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duck.name")) {
+    // the LLM fields, so "Test Connection" can try the values before they are applied
+    private lateinit var urlField: Cell<JBTextField>
+    private lateinit var modelField: Cell<JBTextField>
+    private lateinit var apiKeyField: Cell<JBPasswordField>
+    private lateinit var timeoutField: Cell<JBIntSpinner>
+
     override fun createPanel(): DialogPanel {
         val options = DuckSettings.getInstance().state
         val credentials = DebugDuckCredentials.getInstance()
@@ -160,13 +178,13 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
                         .comment(MyMessageBundle.message("settings.duck.llm.enabled.comment"))
                 }
                 row(MyMessageBundle.message("settings.duck.llm.url")) {
-                    textField()
+                    urlField = textField()
                         .align(AlignX.FILL)
                         .bindText({ options.llmApiUrl.orEmpty() }, { options.llmApiUrl = it.trim() })
                         .comment(MyMessageBundle.message("settings.duck.llm.url.comment"))
                 }
                 row(MyMessageBundle.message("settings.duck.llm.model")) {
-                    textField()
+                    modelField = textField()
                         .columns(COLUMNS_MEDIUM)
                         .bindText({ options.llmModel.orEmpty() }, { options.llmModel = it.trim() })
                 }
@@ -179,12 +197,44 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
                     credentials.whenLoaded { key ->
                         if (keyField.component.password.isEmpty() && key != null) keyField.component.text = key
                     }
+                    apiKeyField = keyField
                 }
                 row(MyMessageBundle.message("settings.duck.llm.timeout")) {
-                    spinner(5..600).bindIntValue(options::llmTimeoutSeconds)
+                    timeoutField = spinner(5..600).bindIntValue(options::llmTimeoutSeconds)
                     label(MyMessageBundle.message("settings.duck.seconds"))
                 }
+                row {
+                    button(MyMessageBundle.message("settings.duck.llm.test")) { testConnection() }
+                        .comment(MyMessageBundle.message("settings.duck.llm.test.comment"))
+                }
             }
+        }
+    }
+
+    /** Sends a tiny request with the values currently in the form and shows whether the model answered. */
+    private fun testConnection() {
+        val component = urlField.component
+        val config = LlmConfig(
+            apiUrl = urlField.component.text,
+            model = modelField.component.text,
+            apiKey = String(apiKeyField.component.password).ifBlank { System.getenv(DebugDuckCredentials.ENV_VARIABLE) },
+            // a connection test shouldn't block the settings for minutes
+            timeoutSeconds = timeoutField.component.number.coerceAtMost(30),
+        )
+        val title = MyMessageBundle.message("settings.duck.llm.test.title")
+        try {
+            val answer = ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                ThrowableComputable<String, LlmException> {
+                    OpenAiCompatibleClient().complete(config, DebugDuckPrompt.CONNECTION_TEST)
+                },
+                MyMessageBundle.message("settings.duck.llm.test.progress"),
+                false,
+                null,
+            )
+            Messages.showInfoMessage(component, MyMessageBundle.message("settings.duck.llm.test.success", answer.take(200)), title)
+        }
+        catch (e: LlmException) {
+            Messages.showErrorDialog(component, e.message, title)
         }
     }
 }

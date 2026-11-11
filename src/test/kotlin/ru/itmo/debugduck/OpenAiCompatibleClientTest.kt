@@ -40,6 +40,25 @@ class OpenAiCompatibleClientTest {
         }
     }
 
+    /** Sends [events] as server-sent events, flushing each one, with [pauseMillis] between them. */
+    private fun stream(events: List<String>, pauseMillis: Long = 0, contentType: String = "text/event-stream") {
+        server.createContext("/") { exchange: HttpExchange ->
+            requestBody = exchange.requestBody.readBytes().decodeToString()
+            exchange.responseHeaders.add("Content-Type", contentType)
+            exchange.sendResponseHeaders(200, 0)
+            exchange.responseBody.use { out ->
+                for (event in events) {
+                    out.write("$event\n\n".encodeToByteArray())
+                    out.flush()
+                    Thread.sleep(pauseMillis)
+                }
+            }
+        }
+    }
+
+    private fun delta(text: String) =
+        "data: " + MiniJson.stringify(mapOf("choices" to listOf(mapOf("index" to 0, "delta" to mapOf("content" to text)))))
+
     private fun config(url: String = baseUrl, key: String? = "sk-test", timeoutSeconds: Int = 5) =
         LlmConfig(apiUrl = url, model = "duck-model", apiKey = key, timeoutSeconds = timeoutSeconds)
 
@@ -171,6 +190,86 @@ class OpenAiCompatibleClientTest {
             "http://localhost:11434/v1/chat/completions",
             OpenAiCompatibleClient.chatCompletionsUri(" http://localhost:11434/v1 ").toString(),
         )
+    }
+
+    @Test
+    fun `streams the answer piece by piece`() {
+        stream(listOf(": OPENROUTER PROCESSING", delta("What "), delta("did you "), delta("expect?"), "data: [DONE]"))
+        val partials = mutableListOf<String>()
+        assertEquals("What did you expect?", client.complete(config(), messages) { partials += it })
+        assertEquals(listOf("What ", "What did you ", "What did you expect?"), partials)
+        assertEquals(true, MiniJson.parse(requestBody!!).jsonField("stream"))
+    }
+
+    @Test
+    fun `hides the thinking of reasoning models while streaming`() {
+        stream(listOf(delta("<think>The user"), delta(" is sad</think>"), delta("\n\nWhy?"), "data: [DONE]"))
+        val partials = mutableListOf<String>()
+        assertEquals("Why?", client.complete(config(), messages) { partials += it })
+        assertEquals(listOf("Why?"), partials)
+    }
+
+    @Test
+    fun `handles servers that ignore the stream flag`() {
+        respond(200, completionBody("Quack"))
+        val partials = mutableListOf<String>()
+        assertEquals("Quack", client.complete(config(), messages) { partials += it })
+        assertTrue(partials.isEmpty())
+    }
+
+    @Test
+    fun `reports an error sent in the middle of a stream`() {
+        stream(listOf(delta("Wh"), "data: {\"error\":{\"message\":\"Rate limit exceeded\"}}"))
+        try {
+            client.complete(config(), messages) {}
+            fail("Expected an LlmException")
+        }
+        catch (e: LlmException) {
+            assertTrue(e.message, "Rate limit exceeded" in e.message!!)
+        }
+    }
+
+    @Test
+    fun `an empty stream is an error`() {
+        stream(listOf("data: [DONE]"))
+        try {
+            client.complete(config(), messages) {}
+            fail("Expected an LlmException")
+        }
+        catch (e: LlmException) {
+            assertTrue(e.message, "empty answer" in e.message!!)
+        }
+    }
+
+    @Test
+    fun `stops streaming when the thread is interrupted`() {
+        stream(listOf(delta("one"), delta(" two"), delta(" three")), pauseMillis = 3_000)
+        var outcome: Throwable? = null
+        val firstPiece = java.util.concurrent.CountDownLatch(1)
+        val worker = Thread {
+            try {
+                client.complete(config(timeoutSeconds = 30), messages) { firstPiece.countDown() }
+            }
+            catch (e: Throwable) {
+                outcome = e
+            }
+        }
+        worker.start()
+        assertTrue(firstPiece.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        val started = System.nanoTime()
+        worker.interrupt()
+        worker.join(5_000)
+        assertTrue("still running", !worker.isAlive)
+        assertTrue(outcome.toString(), outcome is InterruptedException)
+        assertTrue(Duration.ofNanos(System.nanoTime() - started) < Duration.ofMillis(2_000))
+    }
+
+    @Test
+    fun `recognises local servers`() {
+        assertTrue(OpenAiCompatibleClient.isLocal("http://localhost:11434/v1"))
+        assertTrue(OpenAiCompatibleClient.isLocal("http://127.0.0.1:1234/v1"))
+        assertTrue(!OpenAiCompatibleClient.isLocal("https://api.openai.com/v1"))
+        assertTrue(!OpenAiCompatibleClient.isLocal("not a url"))
     }
 
     @Test

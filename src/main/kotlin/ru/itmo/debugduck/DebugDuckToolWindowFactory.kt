@@ -11,6 +11,7 @@ import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.JBColor
@@ -127,7 +128,8 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         add(historyScrollPane, BorderLayout.CENTER)
         add(inputPanel, BorderLayout.SOUTH)
 
-        sendButton.addActionListener { send() }
+        // the same button sends a message or, while the duck is answering, stops the answer
+        sendButton.addActionListener { if (service.state.value.thinking) service.stop() else send() }
         // Enter sends the message, Shift+Enter starts a new line
         input.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), SEND_ACTION)
         input.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK), DefaultEditorKit.insertBreakAction)
@@ -146,10 +148,33 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
     }
 
     private fun send() {
+        if (service.state.value.thinking || !confirmSendingToLlm()) return
         if (service.send(input.text, autoProblems())) {
             input.text = ""
         }
         input.requestFocusInWindow()
+    }
+
+    /**
+     * Before the first message to a remote language model, makes sure the user knows that their messages, code and
+     * errors leave the computer. Local servers such as Ollama don't ask.
+     */
+    private fun confirmSendingToLlm(): Boolean {
+        val settings = DuckSettings.getInstance()
+        if (!settings.isLlmEnabled || settings.state.llmPrivacyAccepted) return true
+        val apiUrl = settings.llmConfig(null).apiUrl
+        if (OpenAiCompatibleClient.isLocal(apiUrl)) return true
+        val answer = Messages.showOkCancelDialog(
+            project,
+            MyMessageBundle.message("debugduck.privacy.message", apiUrl),
+            MyMessageBundle.message("debugduck.privacy.title"),
+            MyMessageBundle.message("debugduck.privacy.ok"),
+            MyMessageBundle.message("debugduck.privacy.cancel"),
+            Messages.getQuestionIcon(),
+        )
+        if (answer != Messages.OK) return false
+        settings.state.llmPrivacyAccepted = true
+        return true
     }
 
     /** Errors from the editor, the last build and the last test run; the service drops the ones already sent. */
@@ -174,8 +199,10 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
             thinking = MyMessageBundle.message("debugduck.thinking"),
         )
         history.background = UIUtil.getPanelBackground()
-        history.text = ChatHtml.render(state.messages, state.thinking, palette(), labels)
-        sendButton.isEnabled = !state.thinking
+        val model = DuckSettings.getInstance().llmConfig(null).model.trim()
+        history.text = ChatHtml.render(state.messages, state.thinking, palette(), labels, state.partialAnswer, model)
+        sendButton.text = MyMessageBundle.message(if (state.thinking) "debugduck.stop" else "debugduck.send")
+        sendButton.icon = if (state.thinking) AllIcons.Actions.Suspend else null
         renderPending(state.pending)
         updateMode()
         SwingUtilities.invokeLater {

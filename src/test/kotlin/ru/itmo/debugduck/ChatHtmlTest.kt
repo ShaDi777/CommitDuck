@@ -40,6 +40,13 @@ class ChatHtmlTest {
     }
 
     @Test
+    fun `shows the streamed part of the answer instead of the thinking line`() {
+        val html = ChatHtml.render(emptyList(), thinking = true, palette, labels, partialAnswer = "What did `x`", partialModel = "llama3")
+        assertTrue(html, "Duck · llama3" in html && "What did <code>x</code>" in html)
+        assertFalse(html, "thinking" in html)
+    }
+
+    @Test
     fun `turns newlines into line breaks`() {
         assertEquals("<div>a<br>b</div>", ChatHtml.formatText("a\nb"))
     }

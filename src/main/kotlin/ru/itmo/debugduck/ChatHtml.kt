@@ -27,14 +27,28 @@ object ChatHtml {
     private val BOLD = Regex("\\*\\*([^*\\n]+)\\*\\*")
     private val BULLET = Regex("^[ \\t]*[-*][ \\t]+", RegexOption.MULTILINE)
 
-    fun render(messages: List<ChatMessage>, thinking: Boolean, palette: ChatPalette, labels: ChatLabels): String = buildString {
+    /**
+     * @param partialAnswer the part of the answer streamed so far, shown instead of the "thinking" line
+     * @param partialModel the model writing [partialAnswer]
+     */
+    fun render(
+        messages: List<ChatMessage>,
+        thinking: Boolean,
+        palette: ChatPalette,
+        labels: ChatLabels,
+        partialAnswer: String? = null,
+        partialModel: String? = null,
+    ): String = buildString {
         append("<html><head><style>")
         append(css(palette))
         append("</style></head><body>")
         for (message in messages) {
             appendMessage(message, labels)
         }
-        if (thinking) {
+        if (thinking && !partialAnswer.isNullOrBlank()) {
+            appendMessage(ChatMessage(ChatRole.DUCK, partialAnswer, model = partialModel), labels)
+        }
+        else if (thinking) {
             append("<div class=\"duck\"><div class=\"who\">").append(escape(labels.duck)).append("</div>")
             append("<i>").append(escape(labels.thinking)).append("</i></div>")
         }

@@ -1,6 +1,7 @@
 package ru.itmo.debugduck
 
 import java.io.IOException
+import java.io.UncheckedIOException
 import java.net.Authenticator
 import java.net.ConnectException
 import java.net.ProxySelector
@@ -12,6 +13,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.HttpTimeoutException
 import java.time.Duration
+import java.util.stream.Stream
 
 data class LlmMessage(val role: String, val content: String) {
     companion object {
@@ -38,15 +40,22 @@ class LlmException(message: String, cause: Throwable? = null) : Exception(messag
  * OpenAI, OpenRouter, DeepSeek, Mistral, Groq, and local servers such as Ollama and LM Studio, so switching providers
  * only needs a different URL, model and key.
  *
- * [complete] is blocking: call it from a background thread. It reacts to thread interruption.
+ * [complete] is blocking: call it from a background thread. It reacts to thread interruption, also while an answer
+ * is being streamed.
  */
 class OpenAiCompatibleClient(private val httpClient: HttpClient = sharedHttpClient) {
 
     /**
      * Sends the conversation and returns the model's answer.
+     *
+     * With [onPartial], the answer is streamed (`"stream": true`, server-sent events) and [onPartial] gets the text
+     * received so far, without the `<think>` part of reasoning models; servers that don't stream are handled too.
+     * The timeout limits the wait for the start of the answer, not its whole length.
+     *
      * @throws LlmException with a user-readable message if the request fails for any reason
+     * @throws InterruptedException if the calling thread is interrupted
      */
-    fun complete(config: LlmConfig, messages: List<LlmMessage>): String {
+    fun complete(config: LlmConfig, messages: List<LlmMessage>, onPartial: ((String) -> Unit)? = null): String {
         val uri = chatCompletionsUri(config.apiUrl)
         val model = config.model.trim()
         if (model.isEmpty()) throw LlmException("No model is configured. Set one in Settings | Tools | Commit Duck.")
@@ -55,19 +64,19 @@ class OpenAiCompatibleClient(private val httpClient: HttpClient = sharedHttpClie
             mapOf(
                 "model" to model,
                 "messages" to messages.map { mapOf("role" to it.role, "content" to it.content) },
-                "stream" to false,
+                "stream" to (onPartial != null),
             )
         )
         val request = HttpRequest.newBuilder(uri)
             .timeout(Duration.ofSeconds(config.timeoutSeconds.coerceAtLeast(1).toLong()))
             .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
+            .header("Accept", if (onPartial != null) "text/event-stream, application/json" else "application/json")
             .apply { config.apiKey?.trim()?.takeIf { it.isNotEmpty() }?.let { header("Authorization", "Bearer $it") } }
             .POST(HttpRequest.BodyPublishers.ofString(body))
             .build()
 
         val response = try {
-            httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            httpClient.send(request, HttpResponse.BodyHandlers.ofLines())
         }
         catch (e: HttpConnectTimeoutException) {
             throw LlmException("Could not connect to ${uri.authority} in time. Check the API URL and your network or proxy.", e)
@@ -84,11 +93,73 @@ class OpenAiCompatibleClient(private val httpClient: HttpClient = sharedHttpClie
             throw LlmException("Network error while contacting ${uri.authority}: ${e.message ?: e.javaClass.simpleName}", e)
         }
 
-        val status = response.statusCode()
-        if (status !in 200..299) {
-            throw LlmException(describeHttpError(status, response.body(), response.headers().firstValue("Location").orElse(null)))
+        return response.body().use { lines ->
+            readBody(uri) {
+                val status = response.statusCode()
+                if (status !in 200..299) {
+                    val location = response.headers().firstValue("Location").orElse(null)
+                    throw LlmException(describeHttpError(status, lines.iterator().asSequence().joinToString("\n"), location))
+                }
+                readAnswer(lines, onPartial)
+            }
         }
-        return parseAnswer(response.body())
+    }
+
+    /** Maps errors while reading the response body; an interrupted read means the request was cancelled. */
+    private inline fun <T> readBody(uri: URI, read: () -> T): T = try {
+        read()
+    }
+    catch (e: UncheckedIOException) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("The request was cancelled")
+        throw LlmException("Network error while reading the answer from ${uri.authority}: ${e.cause?.message ?: e.message}", e)
+    }
+
+    /** A streamed answer (lines starting with `data:`) or a plain JSON response, whatever the server sent. */
+    private fun readAnswer(lines: Stream<String>, onPartial: ((String) -> Unit)?): String {
+        val iterator = lines.iterator()
+        val json = StringBuilder()
+        while (iterator.hasNext()) {
+            val line = iterator.next()
+            if (json.isEmpty() && line.isBlank()) continue
+            if (json.isEmpty() && isEventLine(line)) {
+                return readStream(sequenceOf(line) + iterator.asSequence(), onPartial ?: {})
+            }
+            json.append(line).append('\n')
+        }
+        return parseAnswer(json.toString())
+    }
+
+    private fun readStream(lines: Sequence<String>, onPartial: (String) -> Unit): String {
+        val answer = StringBuilder()
+        var lastVisible = ""
+        var finishReason: String? = null
+        for (line in lines) {
+            if (!line.startsWith("data:")) continue
+            val data = line.removePrefix("data:").trim()
+            if (data == "[DONE]") break
+            if (data.isEmpty()) continue
+            val chunk = try {
+                MiniJson.parse(data)
+            }
+            catch (e: IllegalArgumentException) {
+                throw LlmException("The server sent a broken piece of the answer. Try again.", e)
+            }
+            errorDetail(chunk)?.let { throw LlmException("The LLM server returned an error: $it") }
+            val choice = chunk.jsonField("choices").jsonIndex(0)
+            (choice.jsonField("finish_reason") as? String)?.let { finishReason = it }
+            val delta = choice.jsonField("delta").jsonField("content") as? String ?: continue
+            answer.append(delta)
+            val visible = visibleText(answer.toString())
+            if (visible != lastVisible) {
+                lastVisible = visible
+                onPartial(visible)
+            }
+        }
+        val text = answer.toString().replace(THINKING, "").trim()
+        if (text.isEmpty()) {
+            throw LlmException("The model returned an empty answer" + (finishReason?.let { " (finish reason: $it)" } ?: "") + ". Try again.")
+        }
+        return text
     }
 
     companion object {
@@ -105,6 +176,28 @@ class OpenAiCompatibleClient(private val httpClient: HttpClient = sharedHttpClie
 
         private const val CHAT_COMPLETIONS = "/chat/completions"
         private val THINKING = Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL)
+        private val LOCAL_HOSTS = setOf("localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "host.docker.internal")
+
+        /** Server-sent event lines: `data: ...`, `event: ...` or a `: comment`. */
+        private fun isEventLine(line: String) = line.startsWith("data:") || line.startsWith("event:") || line.startsWith(":")
+
+        /** The streamed text so far, without `<think>` blocks of reasoning models, including one still being written. */
+        fun visibleText(answer: String): String {
+            val withoutFinished = answer.replace(THINKING, "")
+            val open = withoutFinished.indexOf("<think>")
+            return (if (open >= 0) withoutFinished.substring(0, open) else withoutFinished).trimStart()
+        }
+
+        /** Whether [apiUrl] points to this computer, e.g. a local Ollama: then no code leaves the machine. */
+        fun isLocal(apiUrl: String): Boolean {
+            val host = try {
+                chatCompletionsUri(apiUrl).host
+            }
+            catch (e: LlmException) {
+                return false
+            }
+            return host.lowercase() in LOCAL_HOSTS || host.endsWith(".localhost")
+        }
 
         /** `https://api.openai.com/v1` -> `https://api.openai.com/v1/chat/completions`; a full endpoint URL is kept. */
         fun chatCompletionsUri(apiUrl: String): URI {
