@@ -13,6 +13,7 @@
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
@@ -29,11 +30,16 @@
         <statusBarWidgetFactory id="CommitDuck" implementation="ru.itmo.ui.DuckStatusBarWidgetFactory"/>
         <applicationConfigurable parentId="tools" instance="ru.itmo.config.DuckConfigurable"
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
+        <testStatusListener implementation="ru.itmo.listener.DuckTestListener"/>
     </extensions>
 
     <applicationListeners>
         <listener class="ru.itmo.listener.DuckActivityListener" topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
         <listener class="ru.itmo.listener.DuckFileDeleteListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>
-    
+
+    <projectListeners>
+        <listener class="ru.itmo.listener.DuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+    </projectListeners>
+
 </idea-plugin>

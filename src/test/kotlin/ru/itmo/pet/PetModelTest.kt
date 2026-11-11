@@ -67,4 +67,42 @@ class PetModelTest {
         model.handle(Event.WakeUp)
         assertEquals(PetStateType.IDLE, model.state.type)
     }
+
+    @Test
+    fun `successful build makes the duck happy`() {
+        model.handle(Event.BuildSucceeded)
+        assertEquals(PetStateType.HAPPY, model.state.type)
+    }
+
+    @Test
+    fun `passing tests make the duck happy`() {
+        model.handle(Event.TestsPassed)
+        assertEquals(PetStateType.HAPPY, model.state.type)
+    }
+
+    @Test
+    fun `happy reaction returns to the previous state on wake up`() {
+        model.handle(Event.BuildSucceeded)
+        assertEquals(PetStateType.HAPPY, model.state.type)
+        model.handle(Event.WakeUp)
+        assertEquals(PetStateType.IDLE, model.state.type)
+    }
+
+    @Test
+    fun `typing during the happy reaction keeps it happy and returns to working after`() {
+        model.handle(Event.TestsPassed)
+        model.handle(Event.Activity())
+        assertEquals(PetStateType.HAPPY, model.state.type)
+        model.handle(Event.WakeUp)
+        assertEquals(PetStateType.WORKING, model.state.type)
+    }
+
+    @Test
+    fun `a successful build wakes a sleeping duck`() {
+        model.handle(Event.Sleep)
+        model.handle(Event.BuildSucceeded)
+        assertEquals(PetStateType.HAPPY, model.state.type)
+        model.handle(Event.WakeUp)
+        assertEquals(PetStateType.IDLE, model.state.type)
+    }
 }

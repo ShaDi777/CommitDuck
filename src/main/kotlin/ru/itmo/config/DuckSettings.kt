@@ -21,6 +21,8 @@ data class DuckTimeouts(
     val sleepAfter: Duration,
     /** How long the duck shows [PetStateType.DELETED] after the user deletes files. */
     val deletedFor: Duration,
+    /** How long the duck shows [PetStateType.HAPPY] after a successful build or test run. */
+    val happyFor: Duration,
 )
 
 @Service(Service.Level.APP)
@@ -30,12 +32,14 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var idleAfterSeconds by property(30)
         var sleepAfterMinutes by property(10)
         var deletedForSeconds by property(5)
+        var happyForSeconds by property(5)
     }
 
     fun timeouts() = DuckTimeouts(
         idleAfter = state.idleAfterSeconds.seconds,
         sleepAfter = state.sleepAfterMinutes.minutes,
         deletedFor = state.deletedForSeconds.seconds,
+        happyFor = state.happyForSeconds.seconds,
     )
 
     companion object {
@@ -58,6 +62,10 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
             }
             row(MyMessageBundle.message("settings.duck.deleted.for")) {
                 spinner(1..60).bindIntValue(options::deletedForSeconds)
+                label(MyMessageBundle.message("settings.duck.seconds"))
+            }
+            row(MyMessageBundle.message("settings.duck.happy.for")) {
+                spinner(1..60).bindIntValue(options::happyForSeconds)
                 label(MyMessageBundle.message("settings.duck.seconds"))
             }
         }
