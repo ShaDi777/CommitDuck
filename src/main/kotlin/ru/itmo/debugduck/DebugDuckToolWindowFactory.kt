@@ -20,15 +20,22 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
+import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import ru.itmo.config.DuckConfigurable
 import ru.itmo.config.DuckSettings
 import ru.itmo.config.MyMessageBundle
+import ru.itmo.pet.PetStateType
+import ru.itmo.service.DuckService
+import ru.itmo.ui.DuckAnimation
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Dimension
 import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.event.ActionEvent
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
@@ -43,6 +50,7 @@ import javax.swing.JPanel
 import javax.swing.KeyStroke
 import javax.swing.ScrollPaneConstants
 import javax.swing.SwingUtilities
+import javax.swing.Timer
 import javax.swing.text.DefaultCaret
 import javax.swing.text.DefaultEditorKit
 
@@ -63,7 +71,7 @@ class DebugDuckToolWindowFactory : ToolWindowFactory, DumbAware {
         val content = ContentFactory.getInstance().createContent(panel, null, false)
         content.preferredFocusableComponent = panel.preferredFocusedComponent
         toolWindow.contentManager.addContent(content)
-        toolWindow.setTitleActions(listOf(NewConversationAction(project), OpenSettingsAction()))
+        toolWindow.setTitleActions(listOf(SolvedAction(project), NewConversationAction(project), OpenSettingsAction()))
     }
 }
 
@@ -109,6 +117,10 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND
     }
 
+    /** A small copy of the pet: works while the duck answers, otherwise shows what the pet in the status bar does. */
+    private val duckView = ChatDuckView()
+    private var petState = PetStateType.IDLE
+
     val preferredFocusedComponent: JComponent
         get() = input
 
@@ -117,7 +129,11 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
             border = JBUI.Borders.emptyTop(4)
             add(attachLink, BorderLayout.WEST)
             add(sendButton, BorderLayout.EAST)
-            add(modeLabel, BorderLayout.SOUTH)
+            add(JPanel(BorderLayout()).apply {
+                border = JBUI.Borders.emptyTop(4)
+                add(duckView, BorderLayout.WEST)
+                add(modeLabel, BorderLayout.CENTER)
+            }, BorderLayout.SOUTH)
         }
         val inputPanel = JPanel(BorderLayout()).apply {
             border = BorderFactory.createCompoundBorder(JBUI.Borders.customLineTop(JBColor.border()), JBUI.Borders.empty(6, 8))
@@ -142,6 +158,10 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         })
 
         service.subscribe(parentDisposable, ::render)
+        service.subscribe(DuckService.getInstance().state, parentDisposable) {
+            petState = it
+            updateDuck(service.state.value)
+        }
         // the chat colors come from the theme, so re-render when the user switches it
         ApplicationManager.getApplication().messageBus.connect(parentDisposable)
             .subscribe(LafManagerListener.TOPIC, LafManagerListener { render(service.state.value) })
@@ -203,6 +223,7 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         history.text = ChatHtml.render(state.messages, state.thinking, palette(), labels, state.partialAnswer, model)
         sendButton.text = MyMessageBundle.message(if (state.thinking) "debugduck.stop" else "debugduck.send")
         sendButton.icon = if (state.thinking) AllIcons.Actions.Suspend else null
+        updateDuck(state)
         renderPending(state.pending)
         updateMode()
         SwingUtilities.invokeLater {
@@ -220,6 +241,10 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
             else MyMessageBundle.message("debugduck.pending.with.errors", what, pending.problems.size)
         pendingLabel.toolTipText = pending.problems.joinToString("\n") { it.summary }.ifEmpty { null }
         pendingPanel.revalidate()
+    }
+
+    private fun updateDuck(state: DebugDuckState) {
+        duckView.state = if (state.thinking) PetStateType.WORKING else petState
     }
 
     private fun updateMode() {
@@ -256,6 +281,67 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         val NOTICE_FOREGROUND = JBColor(0x9E2A2A, 0xF2A7A7)
         val CODE_BACKGROUND = JBColor(0xF2F3F5, 0x1E1F22)
     }
+}
+
+/** A small animated duck next to the mode line, drawn with the pet's sprites. */
+private class ChatDuckView : JComponent() {
+    private val animations = PetStateType.entries.associateWith { DuckAnimation.load(it.animationName, "status") }
+    private var animation = animations.getValue(PetStateType.IDLE)
+    private var frame = 0
+    private val timer = Timer(1000 / animation.fps) {
+        frame = (frame + 1) % animation.frameCount
+        repaint()
+    }
+
+    var state: PetStateType = PetStateType.IDLE
+        set(value) {
+            if (field == value) return
+            field = value
+            animation = animations.getValue(value)
+            frame = 0
+            timer.delay = 1000 / animation.fps
+            repaint()
+        }
+
+    init {
+        isOpaque = false
+        border = JBUI.Borders.emptyRight(6)
+    }
+
+    override fun addNotify() {
+        super.addNotify()
+        timer.start()
+    }
+
+    override fun removeNotify() {
+        timer.stop()
+        super.removeNotify()
+    }
+
+    override fun getPreferredSize(): Dimension {
+        val height = JBUIScale.scale(HEIGHT)
+        val width = height * animation.frameWidth / animation.frameHeight
+        return Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom)
+    }
+
+    override fun paintComponent(g: Graphics) {
+        val height = JBUIScale.scale(HEIGHT)
+        val width = height * animation.frameWidth / animation.frameHeight
+        animation.paintFrame(g as Graphics2D, frame, insets.left, (this.height - height) / 2, width, height)
+    }
+
+    private companion object {
+        const val HEIGHT = 24
+    }
+}
+
+/** "Solved!": the duck congratulates, the pet is happy and the solved counter goes up. */
+private class SolvedAction(private val project: Project) : DumbAwareAction(
+    MyMessageBundle.message("debugduck.solved"),
+    MyMessageBundle.message("debugduck.solved.description"),
+    AllIcons.General.InspectionsOK,
+) {
+    override fun actionPerformed(e: AnActionEvent) = DebugDuckService.getInstance(project).markSolved()
 }
 
 private class NewConversationAction(private val project: Project) : DumbAwareAction(

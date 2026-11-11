@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +39,8 @@ data class DebugDuckState(
     val pending: PendingContext? = null,
     /** The part of the language model's answer received so far, while [thinking]. */
     val partialAnswer: String? = null,
+    /** The user said the problem is solved; counted once per conversation. */
+    val solved: Boolean = false,
 )
 
 /**
@@ -55,11 +58,30 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
     val state: StateFlow<DebugDuckState> = mutableState.asStateFlow()
 
     /** Calls [listener] on the EDT with the current state and every change, until [disposable] is disposed. */
-    fun subscribe(disposable: Disposable, listener: (DebugDuckState) -> Unit) {
+    fun subscribe(disposable: Disposable, listener: (DebugDuckState) -> Unit) = subscribe(state, disposable, listener)
+
+    /** Calls [listener] on the EDT with every value of [flow], until [disposable] is disposed. */
+    fun <T> subscribe(flow: Flow<T>, disposable: Disposable, listener: (T) -> Unit) {
         val job = scope.launch(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-            state.collect { listener(it) }
+            flow.collect { listener(it) }
         }
         Disposer.register(disposable) { job.cancel() }
+    }
+
+    /** The user says the problem is solved: the duck congratulates, and the pet in the status bar is happy. */
+    fun markSolved() {
+        val congratulation = synchronized(localDuck) {
+            localDuck.fixedLanguage = DuckSettings.getInstance().fixedDuckLanguage
+            localDuck.congratulate().text
+        }
+        recordSolved()
+        mutableState.update { it.copy(messages = it.messages + ChatMessage(ChatRole.DUCK, congratulation)) }
+    }
+
+    private fun recordSolved() {
+        val before = mutableState.getAndUpdate { it.copy(solved = true) }
+        if (!before.solved) DebugDuckStats.getInstance().problemSolved()
+        DuckService.getInstance().handle(Event.ProblemSolved)
     }
 
     /** Attaches code and errors from the editor to the next message, replacing what was attached before. */
@@ -83,6 +105,7 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
 
         // talking to the duck is activity too: the duck in the status bar wakes up and works along
         DuckService.getInstance().handle(Event.Activity())
+        if (LocalDebugDuck.isSolved(message.text)) recordSolved()
 
         val newState = mutableState.updateAndGet {
             it.copy(messages = it.messages + message, thinking = true, pending = null)
@@ -129,16 +152,18 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
         mutableState.update { DebugDuckState(listOf(greeting()), conversationId = it.conversationId + 1, pending = it.pending) }
     }
 
-    /** E.g. "Mode: language model (gpt-5-mini)", shown in the tool window. */
+    /** E.g. "Mode: language model (gpt-5-mini) · Solved with the duck: 3", shown in the tool window. */
     val modeDescription: String
         get() {
             val settings = DuckSettings.getInstance()
-            return if (settings.isLlmEnabled) {
+            val mode = if (settings.isLlmEnabled) {
                 MyMessageBundle.message("debugduck.mode.llm", settings.llmConfig(null).model.ifBlank { "?" })
             }
             else {
                 MyMessageBundle.message("debugduck.mode.local")
             }
+            val solved = DebugDuckStats.getInstance().solvedProblems
+            return if (solved == 0) mode else mode + " · " + MyMessageBundle.message("debugduck.solved.count", solved)
         }
 
     private suspend fun answer(history: List<ChatMessage>, message: ChatMessage, conversationId: Int): List<ChatMessage> {

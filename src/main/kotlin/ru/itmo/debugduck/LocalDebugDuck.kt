@@ -64,6 +64,9 @@ class LocalDebugDuck(
         return reply
     }
 
+    /** A congratulation in the current language, e.g. when the user marks the problem as solved. */
+    fun congratulate(): LocalReply = LocalReply(t(pickCycling(SOLVED_REPLIES)), ReplyKind.SOLVED)
+
     fun reset() {
         asked.clear()
         phaseIndex = 0
@@ -73,10 +76,7 @@ class LocalDebugDuck(
         lastAcknowledgement = ""
     }
 
-    private fun solvedReply(text: String): LocalReply? {
-        if (!SOLVED.matches(text) || NOT_SOLVED.matches(text)) return null
-        return LocalReply(t(pickCycling(SOLVED_REPLIES)), ReplyKind.SOLVED)
-    }
+    private fun solvedReply(text: String): LocalReply? = if (isSolved(text)) congratulate() else null
 
     private fun thanksReply(text: String): LocalReply? {
         // "thanks, but the test still fails" is not the end of the conversation
@@ -190,6 +190,12 @@ class LocalDebugDuck(
         }
 
     internal companion object {
+        /** Whether the user says the problem is solved: "fixed it!", "заработало", but not "still not fixed". */
+        fun isSolved(userText: String): Boolean {
+            val text = userText.lowercase()
+            return SOLVED.matches(text) && !NOT_SOLVED.matches(text)
+        }
+
         /** Every phrase the duck can say, in English; used to check the translations. */
         fun allPhrases(): List<String> =
             GREETINGS + ACKNOWLEDGEMENTS.filter { it.isNotEmpty() } + SOLVED_REPLIES + THANKS_REPLIES + CODE_QUESTIONS +

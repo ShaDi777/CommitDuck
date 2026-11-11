@@ -151,6 +151,22 @@ class LocalDebugDuckTest {
     }
 
     @Test
+    fun `recognises a solved problem`() {
+        assertTrue(LocalDebugDuck.isSolved("Fixed it!"))
+        assertTrue(LocalDebugDuck.isSolved("ура, заработало"))
+        assertFalse(LocalDebugDuck.isSolved("still not fixed"))
+        assertFalse(LocalDebugDuck.isSolved("what does the compiler say?"))
+    }
+
+    @Test
+    fun `congratulates on request without repeating itself`() {
+        val first = duck.congratulate()
+        val second = duck.congratulate()
+        assertEquals(ReplyKind.SOLVED, first.kind)
+        assertNotEquals(first.text, second.text)
+    }
+
+    @Test
     fun `does not congratulate when it still does not work`() {
         assertNotEquals(ReplyKind.SOLVED, duck.reply("it still does not work").kind)
         assertNotEquals(ReplyKind.SOLVED, duck.reply("всё ещё не работает").kind)

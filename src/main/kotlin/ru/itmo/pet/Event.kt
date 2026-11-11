@@ -39,6 +39,9 @@ sealed interface Event {
     /** A test run finished with all tests passing. */
     data object TestsPassed : Event
 
+    /** The user solved a problem they discussed with the Debug Duck. */
+    data object ProblemSolved : Event
+
     /** An activity milestone (e.g. 1 000 / 10 000 characters) was reached. */
     data class ThresholdReached(val chars: Long) : Event
 

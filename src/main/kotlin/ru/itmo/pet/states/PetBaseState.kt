@@ -16,6 +16,8 @@ abstract class PetBaseState : PetState {
         // a successful build or test run cheers the duck up for a moment
         Event.BuildSucceeded -> HappyState(this)
         Event.TestsPassed -> HappyState(this)
+        // so does a problem solved with the Debug Duck
+        Event.ProblemSolved -> HappyState(this)
         // States that need sprites the duck doesn't have yet are commented out:
         // Event.DuckClicked -> HappyState()
         // Event.Commit -> HappyState()

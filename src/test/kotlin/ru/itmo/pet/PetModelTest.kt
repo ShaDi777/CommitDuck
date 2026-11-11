@@ -75,6 +75,15 @@ class PetModelTest {
     }
 
     @Test
+    fun `a problem solved with the debug duck makes the duck happy`() {
+        model.handle(Event.Activity())
+        model.handle(Event.ProblemSolved)
+        assertEquals(PetStateType.HAPPY, model.state.type)
+        model.handle(Event.WakeUp)
+        assertEquals(PetStateType.WORKING, model.state.type)
+    }
+
+    @Test
     fun `passing tests make the duck happy`() {
         model.handle(Event.TestsPassed)
         assertEquals(PetStateType.HAPPY, model.state.type)
