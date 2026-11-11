@@ -44,7 +44,7 @@ data class DebugDuckState(
  */
 @Service(Service.Level.PROJECT)
 class DebugDuckService(@Suppress("unused") private val project: Project, private val scope: CoroutineScope) {
-    private val localDuck = LocalDebugDuck()
+    private val localDuck = LocalDebugDuck(language = DuckSettings.getInstance().initialDuckLanguage)
     private val llmClient = OpenAiCompatibleClient()
     private val mutableState = MutableStateFlow(DebugDuckState(listOf(greeting())))
     private var answerJob: Job? = null
@@ -134,7 +134,7 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
         val config = settings.llmConfig(DebugDuckCredentials.getInstance().apiKey())
         return try {
             val text = runInterruptible(Dispatchers.IO) {
-                llmClient.complete(config, DebugDuckPrompt.buildMessages(history))
+                llmClient.complete(config, DebugDuckPrompt.buildMessages(history, settings.fixedDuckLanguage))
             }
             listOf(ChatMessage(ChatRole.DUCK, text, model = config.model.trim()))
         }
@@ -148,11 +148,18 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
     }
 
     private fun localAnswer(message: ChatMessage): ChatMessage {
-        val reply = synchronized(localDuck) { localDuck.reply(message.text, message.attachment, message.problems) }
+        val reply = synchronized(localDuck) {
+            localDuck.fixedLanguage = DuckSettings.getInstance().fixedDuckLanguage
+            localDuck.reply(message.text, message.attachment, message.problems)
+        }
         return ChatMessage(ChatRole.DUCK, reply.text)
     }
 
-    private fun greeting() = ChatMessage(ChatRole.DUCK, synchronized(localDuck) { localDuck.greeting().text })
+    private fun greeting() = ChatMessage(ChatRole.DUCK, synchronized(localDuck) {
+        // a new conversation starts in the chosen language, or in the one the user spoke last
+        localDuck.fixedLanguage = DuckSettings.getInstance().fixedDuckLanguage
+        localDuck.greeting().text
+    })
 
     companion object {
         private val LOG = logger<DebugDuckService>()

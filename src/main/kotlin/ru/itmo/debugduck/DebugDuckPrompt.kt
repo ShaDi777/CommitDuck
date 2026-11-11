@@ -30,7 +30,8 @@ object DebugDuckPrompt {
         - If the message is not about software development, gently steer the conversation back to the problem.
     """.trimIndent()
 
-    fun buildMessages(history: List<ChatMessage>): List<LlmMessage> {
+    /** @param language always answer in this language; `null` to answer in the language the user writes in */
+    fun buildMessages(history: List<ChatMessage>, language: DuckLanguage? = null): List<LlmMessage> {
         val conversation = history
             .filter { it.role != ChatRole.NOTICE }
             .takeLast(MAX_HISTORY_MESSAGES)
@@ -40,7 +41,12 @@ object DebugDuckPrompt {
                     else -> LlmMessage(LlmMessage.ASSISTANT, message.text)
                 }
             }
-        return listOf(LlmMessage(LlmMessage.SYSTEM, SYSTEM_PROMPT)) + conversation
+        val system = when (language) {
+            null -> SYSTEM_PROMPT
+            DuckLanguage.ENGLISH -> "$SYSTEM_PROMPT\n- Always reply in English, whatever language the developer writes in."
+            DuckLanguage.RUSSIAN -> "$SYSTEM_PROMPT\n- Always reply in Russian, whatever language the developer writes in."
+        }
+        return listOf(LlmMessage(LlmMessage.SYSTEM, system)) + conversation
     }
 
     /**

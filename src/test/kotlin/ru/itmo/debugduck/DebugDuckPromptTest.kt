@@ -29,6 +29,12 @@ class DebugDuckPromptTest {
     }
 
     @Test
+    fun `can make the model always answer in one language`() {
+        val system = DebugDuckPrompt.buildMessages(emptyList(), DuckLanguage.RUSSIAN).first().content
+        assertTrue(system, system.startsWith(DebugDuckPrompt.SYSTEM_PROMPT) && system.endsWith("Always reply in Russian, whatever language the developer writes in."))
+    }
+
+    @Test
     fun `does not send plugin notices to the model`() {
         val messages = DebugDuckPrompt.buildMessages(
             listOf(

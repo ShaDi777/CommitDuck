@@ -17,9 +17,23 @@ data class LocalReply(val text: String, val kind: ReplyKind, val topic: DebugTop
  * pick the topic too, so "I have a CE" plus the compiler message gets compile-error hints right away.
  * Questions are not repeated within one conversation.
  *
+ * The duck speaks English or Russian ([RussianPhrases]): the language of the user's last message, unless
+ * [fixedLanguage] is set.
+ *
  * Pure Kotlin without IDE dependencies, so it can be unit-tested with a seeded [random].
  */
-class LocalDebugDuck(private val random: Random = Random.Default) {
+class LocalDebugDuck(
+    private val random: Random = Random.Default,
+    /** The language before the user wrote anything, i.e. of the greeting. */
+    var language: DuckLanguage = DuckLanguage.ENGLISH,
+) {
+    /** Always answer in this language; `null` to follow the language of the user's messages. */
+    var fixedLanguage: DuckLanguage? = null
+        set(value) {
+            field = value
+            if (value != null) language = value
+        }
+
     private val asked = mutableSetOf<String>()
     private var phaseIndex = 0
     /** Checklist steps the user already talked about without being asked, e.g. "it fails every time". */
@@ -29,9 +43,10 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
     private var lastKind: ReplyKind? = null
     private var lastAcknowledgement = ""
 
-    fun greeting(): LocalReply = LocalReply(GREETINGS.random(random), ReplyKind.GREETING)
+    fun greeting(): LocalReply = LocalReply(t(GREETINGS.random(random)), ReplyKind.GREETING)
 
     fun reply(userText: String, attachment: CodeAttachment? = null, problems: List<IdeProblem> = emptyList()): LocalReply {
+        if (fixedLanguage == null) DuckLanguage.detect(userText)?.let { language = it }
         val text = userText.lowercase()
         DebugPhase.entries.filterTo(coveredPhases) { it.isAnsweredBy(text) }
         val problemTopics = topicsOf(problems)
@@ -60,13 +75,13 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
 
     private fun solvedReply(text: String): LocalReply? {
         if (!SOLVED.matches(text) || NOT_SOLVED.matches(text)) return null
-        return LocalReply(pickCycling(SOLVED_REPLIES), ReplyKind.SOLVED)
+        return LocalReply(t(pickCycling(SOLVED_REPLIES)), ReplyKind.SOLVED)
     }
 
     private fun thanksReply(text: String): LocalReply? {
         // "thanks, but the test still fails" is not the end of the conversation
         if (!THANKS.matches(text) || text.split(WHITESPACE).size > 6) return null
-        return LocalReply(pickCycling(THANKS_REPLIES), ReplyKind.THANKS)
+        return LocalReply(t(pickCycling(THANKS_REPLIES)), ReplyKind.THANKS)
     }
 
     /** Quotes the first new IDE problem and follows up with a hint for its topic. */
@@ -75,19 +90,32 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
         val message = problem.message.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty().let {
             if (it.length > MAX_QUOTE_LENGTH) it.take(MAX_QUOTE_LENGTH) + "..." else it
         }
-        val quote = when (problem.kind) {
-            ProblemKind.CODE, ProblemKind.BUILD ->
-                if (problem.location != null) "The IDE reports an error at ${problem.location}: \"$message\"."
-                else "The IDE reports an error: \"$message\"."
-            ProblemKind.TEST ->
-                if (problem.location != null) "The test ${problem.location} failed: \"$message\"."
-                else "A test failed: \"$message\"."
+        val location = problem.location
+        val test = problem.kind == ProblemKind.TEST
+        val quote = when (language) {
+            DuckLanguage.ENGLISH -> when {
+                test && location != null -> "The test $location failed: \"$message\"."
+                test -> "A test failed: \"$message\"."
+                location != null -> "The IDE reports an error at $location: \"$message\"."
+                else -> "The IDE reports an error: \"$message\"."
+            }
+            DuckLanguage.RUSSIAN -> when {
+                test && location != null -> "Тест $location упал: «$message»."
+                test -> "Упал тест: «$message»."
+                location != null -> "IDE сообщает об ошибке в $location: «$message»."
+                else -> "IDE сообщает об ошибке: «$message»."
+            }
         }
-        val more = if (problems.size > 1) " (and ${problems.size - 1} more)" else ""
+        val others = problems.size - 1
+        val more = when {
+            others == 0 -> ""
+            language == DuckLanguage.RUSSIAN -> " (и ещё $others)"
+            else -> " (and $others more)"
+        }
         // new information from the IDE beats the alternation of hints and checklist questions
         for (topic in mentionedTopics) {
             val hint = pickUnasked(topic.hints) ?: continue
-            return LocalReply("$quote$more $hint", ReplyKind.PROBLEM, topic)
+            return LocalReply("$quote$more ${t(hint)}", ReplyKind.PROBLEM, topic)
         }
         val question = phaseReply(acknowledge = false)?.text ?: genericReply(acknowledge = false).text
         return LocalReply("$quote$more $question", ReplyKind.PROBLEM)
@@ -98,19 +126,18 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
         val code = attachment.code
         if (code == null) {
             val template = pickUnasked(FILE_QUESTIONS) ?: return null
-            return LocalReply(template.replace("{file}", attachment.fileName), ReplyKind.FILE)
+            return LocalReply(t(template).replace("{file}", attachment.fileName), ReplyKind.FILE)
         }
         val template = pickUnasked(CODE_QUESTIONS) ?: return null
-        val lines = attachment.lineCount
-        val text = template
+        val text = t(template)
             .replace("{file}", attachment.fileName)
-            .replace("{lines}", if (lines == 1) "1 line" else "$lines lines")
+            .replace("{lines}", linesText(attachment.lineCount, language))
         return LocalReply(text, ReplyKind.CODE)
     }
 
     private fun stuckReply(text: String): LocalReply? {
         if (!STUCK.matches(text)) return null
-        return LocalReply(pickCycling(STUCK_REPLIES), ReplyKind.STUCK)
+        return LocalReply(t(pickCycling(STUCK_REPLIES)), ReplyKind.STUCK)
     }
 
     private fun topicReply(mentionedTopics: List<DebugTopic>): LocalReply? {
@@ -120,7 +147,7 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
         // error" is still about the compile error, not about "the loop in line 13" mentioned in passing
         for (topic in mentionedTopics.ifEmpty { mainTopics }) {
             val hint = pickUnasked(topic.hints) ?: continue
-            return LocalReply(acknowledge() + hint, ReplyKind.TOPIC, topic)
+            return LocalReply(acknowledge() + t(hint), ReplyKind.TOPIC, topic)
         }
         return null
     }
@@ -133,19 +160,23 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
             val phase = phases[phaseIndex++]
             if (phase in coveredPhases || phase in irrelevant) continue
             val question = pickUnasked(phase.questions)
-            if (question != null) return LocalReply((if (acknowledge) acknowledge() else "") + question, ReplyKind.PHASE)
+            if (question != null) return LocalReply((if (acknowledge) acknowledge() else "") + t(question), ReplyKind.PHASE)
         }
         return null
     }
 
     private fun genericReply(acknowledge: Boolean = true) =
-        LocalReply((if (acknowledge) acknowledge() else "") + pickCycling(GENERIC_QUESTIONS), ReplyKind.GENERIC)
+        LocalReply((if (acknowledge) acknowledge() else "") + t(pickCycling(GENERIC_QUESTIONS)), ReplyKind.GENERIC)
 
     private fun acknowledge(): String {
         val acknowledgement = ACKNOWLEDGEMENTS.filter { it.isEmpty() || it != lastAcknowledgement }.random(random)
         lastAcknowledgement = acknowledgement
-        return acknowledgement
+        return t(acknowledgement)
     }
+
+    /** [phrase] in the current [language]; phrases are kept in English and translated when they are said. */
+    private fun t(phrase: String): String =
+        if (language == DuckLanguage.RUSSIAN && phrase.isNotEmpty()) RussianPhrases.byEnglish[phrase] ?: phrase else phrase
 
     /** A random phrase from [pool] that wasn't used in this conversation yet, or `null` if all were used. */
     private fun pickUnasked(pool: List<String>): String? =
@@ -158,7 +189,13 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
             pickUnasked(pool)!!
         }
 
-    private companion object {
+    internal companion object {
+        /** Every phrase the duck can say, in English; used to check the translations. */
+        fun allPhrases(): List<String> =
+            GREETINGS + ACKNOWLEDGEMENTS.filter { it.isNotEmpty() } + SOLVED_REPLIES + THANKS_REPLIES + CODE_QUESTIONS +
+                FILE_QUESTIONS + STUCK_REPLIES + GENERIC_QUESTIONS +
+                DebugPhase.entries.flatMap { it.questions } + DebugTopic.entries.flatMap { it.hints }
+
         val WHITESPACE = Regex("\\s+")
         const val MAX_QUOTE_LENGTH = 160
 
@@ -229,7 +266,7 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
         )
 
         val FILE_QUESTIONS = listOf(
-            "You're in {file}. Is the problem in this file, or in something it calls? Select the suspicious lines in the editor, tick \"Attach editor selection\" and send them to me.",
+            "You're in {file}. Is the problem in this file, or in something it calls? Select the suspicious lines and send them with \"Attach from editor\" or \"Ask Debug Duck\" in the editor's context menu.",
         )
 
         val STUCK_REPLIES = listOf(

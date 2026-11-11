@@ -15,8 +15,11 @@ import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.bindItem
 import ru.itmo.debugduck.DebugDuckCredentials
+import ru.itmo.debugduck.DuckLanguage
 import ru.itmo.debugduck.LlmConfig
+import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -33,6 +36,16 @@ data class DuckTimeouts(
     /** How long the duck shows [PetStateType.HAPPY] after a successful build or test run. */
     val happyFor: Duration,
 )
+
+/** Which language the Debug Duck speaks. */
+enum class DuckLanguageSetting(private val titleKey: String) {
+    AUTO("settings.duck.language.auto"),
+    ENGLISH("settings.duck.language.english"),
+    RUSSIAN("settings.duck.language.russian");
+
+    // shown by the combo box
+    override fun toString(): String = MyMessageBundle.message(titleKey)
+}
 
 @Service(Service.Level.APP)
 @State(name = "CommitDuckSettings", storages = [Storage("commitDuck.xml")])
@@ -54,6 +67,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var llmTimeoutSeconds by property(60)
         /** Debug Duck: send errors from the editor, the last build and the last test run along with messages. */
         var shareIdeProblems by property(true)
+        var duckLanguage by enum(DuckLanguageSetting.AUTO)
     }
 
     fun timeouts() = DuckTimeouts(
@@ -72,6 +86,18 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
 
     val isLlmEnabled: Boolean
         get() = state.llmEnabled
+
+    /** The language chosen in the settings; `null` for "the language of the user's message". */
+    val fixedDuckLanguage: DuckLanguage?
+        get() = when (state.duckLanguage) {
+            DuckLanguageSetting.AUTO -> null
+            DuckLanguageSetting.ENGLISH -> DuckLanguage.ENGLISH
+            DuckLanguageSetting.RUSSIAN -> DuckLanguage.RUSSIAN
+        }
+
+    /** The language of the greeting: the chosen one, or the system language. */
+    val initialDuckLanguage: DuckLanguage
+        get() = fixedDuckLanguage ?: DuckLanguage.forLocale(Locale.getDefault().toLanguageTag())
 
     fun llmConfig(apiKey: String?) = LlmConfig(
         apiUrl = state.llmApiUrl.orEmpty(),
@@ -119,6 +145,10 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
             }
 
             group(MyMessageBundle.message("settings.duck.llm.group")) {
+                row(MyMessageBundle.message("settings.duck.language")) {
+                    comboBox(DuckLanguageSetting.entries)
+                        .bindItem({ options.duckLanguage }, { options.duckLanguage = it ?: DuckLanguageSetting.AUTO })
+                }
                 row {
                     checkBox(MyMessageBundle.message("settings.duck.share.problems"))
                         .bindSelected(options::shareIdeProblems)
