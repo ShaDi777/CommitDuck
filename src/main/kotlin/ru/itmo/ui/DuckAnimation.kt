@@ -61,7 +61,7 @@ class DuckAnimation private constructor(
         private val cache = ConcurrentHashMap<String, DuckAnimation>()
 
         /** @param state lowercase state name, e.g. `idle`; @param size sprite size directory, e.g. `status` */
-        fun load(state: String, size: String): DuckAnimation =
+        fun load(state: String, size: String = "status"): DuckAnimation =
             cache.computeIfAbsent("$size/$state") { _ ->
                 val path = "$size/$state"
                 val properties = Properties().apply {

@@ -33,6 +33,10 @@
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
         <testStatusListener implementation="ru.itmo.listener.DuckTestListener"/>
         <checkinHandlerFactory implementation="ru.itmo.listener.DuckCommitListener"/>
+
+        <notificationGroup
+                id="Commit Duck Achievements"
+                displayType="BALLOON"/>
     </extensions>
 
     <applicationListeners>

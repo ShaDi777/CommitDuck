@@ -28,7 +28,7 @@ RENDER_SIZE = 512
 # Add e.g. "large": 128 when the tool window needs a big duck (costs ~3 MB per state).
 SIZES = {
     "status": 18,
-    "popup": 96,
+    "popup": 72,
 }
 # keep sheets well below common image size limits
 MAX_SHEET_WIDTH = 4096
@@ -114,14 +114,51 @@ def convert(sticker: Path, out: Path, fps: int, preview: Optional[Path]) -> None
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("stickers", type=Path, nargs="+", help="input .tgs files named after states, e.g. idle.tgs")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory (default: src/main/resources/duck)")
-    parser.add_argument("--fps", type=int, default=30, help="output frame rate (default: 30)")
-    parser.add_argument("--preview", type=Path, help="optional directory for a light/dark GIF preview")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "stickers",
+        type=Path,
+        nargs="+",
+        help="Input .tgs files or directories containing .tgs files"
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=DEFAULT_OUT,
+        help="Output directory (default: src/main/resources/duck)"
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=30,
+        help="Output frame rate (default: 30)"
+    )
+    parser.add_argument(
+        "--preview",
+        type=Path,
+        help="Optional directory for light/dark GIF previews"
+    )
+
     args = parser.parse_args()
 
-    for sticker in args.stickers:
+    stickers = []
+
+    for path in args.stickers:
+        if path.is_dir():
+            stickers.extend(sorted(path.glob("*.tgs")))
+        elif path.is_file() and path.suffix.lower() == ".tgs":
+            stickers.append(path)
+        else:
+            parser.error(f"Not a .tgs file or directory: {path}")
+
+    if not stickers:
+        parser.error("No .tgs files found")
+
+    for sticker in stickers:
+        print(f"\nProcessing: {sticker}")
         convert(sticker, args.out, args.fps, args.preview)
 
 
