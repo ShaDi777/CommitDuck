@@ -121,7 +121,7 @@ class DuckService(scope: CoroutineScope) {
                     now + timeouts.deletedFor.inWholeMilliseconds
             }
 
-            Event.BuildSucceeded, Event.TestsPassed -> {
+            Event.BuildSucceeded, Event.TestsPassed, Event.Commit -> {
                 lastActivityMillis = now
                 happyUntilMillis =
                     now + timeouts.happyFor.inWholeMilliseconds
