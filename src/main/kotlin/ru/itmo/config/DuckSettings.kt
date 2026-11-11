@@ -11,6 +11,7 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.bindIntValue
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
+import ru.itmo.statistics.DuckStatistics
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -39,6 +40,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var happyForSeconds by property(5)
         var isFirstLaunch by property(true)
         var quackOnClick by property(true)
+        var typedChars by property(0)
     }
 
     fun timeouts() = DuckTimeouts(
@@ -64,6 +66,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
 class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duck.name")) {
     override fun createPanel(): DialogPanel {
         val options = DuckSettings.getInstance().state
+        val statistics = DuckStatistics.getInstance()
         return panel {
             row(MyMessageBundle.message("settings.duck.idle.after")) {
                 spinner(1..3600).bindIntValue(options::idleAfterSeconds)
@@ -87,6 +90,10 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
             }
             row {
                 checkBox(MyMessageBundle.message("settings.duck.quack.on.click")).bindSelected(options::quackOnClick)
+            }
+
+            row("Statistics") {
+                label("Characters entered: ${statistics.typedChars.value}")
             }
         }
     }

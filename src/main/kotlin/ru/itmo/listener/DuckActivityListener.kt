@@ -28,7 +28,7 @@ private val EDITING_ACTIONS = setOf(
 class DuckActivityListener : AnActionListener {
     override fun afterEditorTyping(c: Char, dataContext: DataContext) {
         if (isCodeEditor(CommonDataKeys.EDITOR.getData(dataContext))) {
-            DuckService.getInstance().handle(Event.Activity())
+            DuckService.getInstance().handle(Event.Activity(1))
         }
     }
 

@@ -13,6 +13,7 @@ import ru.itmo.pet.Event
 import ru.itmo.pet.PetModel
 import ru.itmo.pet.PetStateType
 import ru.itmo.pet.states.GreetingState
+import ru.itmo.statistics.DuckStatistics
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -22,6 +23,7 @@ class DuckService(scope: CoroutineScope) {
 
     private val model = PetModel(GreetingState())
     private val settings = DuckSettings.getInstance()
+    private val statistics = DuckStatistics.getInstance()
 
     private val mutableState = MutableStateFlow(model.state.type)
     val state: StateFlow<PetStateType> = mutableState.asStateFlow()
@@ -46,6 +48,22 @@ class DuckService(scope: CoroutineScope) {
 
     fun handle(event: Event) {
         synchronized(model) {
+            when (event) {
+                is Event.Activity ->
+                    statistics.addTypedChars(event.typedChars)
+
+                Event.Commit ->
+                    statistics.addCommit()
+
+                Event.BuildSucceeded ->
+                    statistics.addSuccessfulBuild()
+
+                Event.TestsPassed ->
+                    statistics.addPassedTests()
+
+                else -> Unit
+            }
+
             updateTimestamps(event)
 
             model.handle(event)
