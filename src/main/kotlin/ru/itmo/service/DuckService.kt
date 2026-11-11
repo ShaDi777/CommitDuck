@@ -48,18 +48,6 @@ class DuckService(scope: CoroutineScope) {
         synchronized(model) {
             updateTimestamps(event)
 
-            when (event) {
-                is Event.Activity -> lastActivityMillis = now
-                Event.Deleted -> {
-                    lastActivityMillis = now
-                    deletedUntilMillis = now + timeouts.deletedFor.inWholeMilliseconds
-                }
-                Event.BuildSucceeded, Event.TestsPassed, Event.ProblemSolved -> {
-                    lastActivityMillis = now
-                    happyUntilMillis = now + timeouts.happyFor.inWholeMilliseconds
-                }
-                else -> {}
-            }
             model.handle(event)
             publishState()
         }
@@ -133,7 +121,7 @@ class DuckService(scope: CoroutineScope) {
                     now + timeouts.deletedFor.inWholeMilliseconds
             }
 
-            Event.BuildSucceeded, Event.TestsPassed -> {
+            Event.BuildSucceeded, Event.TestsPassed, Event.ProblemSolved -> {
                 lastActivityMillis = now
                 happyUntilMillis =
                     now + timeouts.happyFor.inWholeMilliseconds
