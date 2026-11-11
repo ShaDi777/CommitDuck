@@ -12,3 +12,9 @@ This repository implements an IntelliJ Platform plugin.
 
 The duck's animations are generated from Telegram animated stickers in `assets/stickers/`.
 See [docs/assets.md](docs/assets.md) for how to download a sticker and convert it into sprite sheets for the plugin.
+
+## Debug Duck
+
+Stuck on a bug? Open the **Debug Duck** tool window and talk the problem through with the duck. It asks leading
+questions from a built-in debugging checklist, or, if enabled in *Settings | Tools | Commit Duck*, uses any
+OpenAI-compatible language model (OpenAI, OpenRouter, a local Ollama, ...). See [docs/debug-duck.md](docs/debug-duck.md).
