@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.service
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ru.itmo.config.DuckSettings
 import ru.itmo.pet.Event
 import ru.itmo.pet.PetModel
 import ru.itmo.pet.PetStateType
@@ -24,6 +25,7 @@ class DuckService(scope: CoroutineScope) {
 
     private var lastActivityMillis = System.currentTimeMillis()
     private var deletedUntilMillis = Long.MIN_VALUE
+    private var happyUntilMillis = Long.MIN_VALUE
 
     init {
         scope.launch {
@@ -39,6 +41,10 @@ class DuckService(scope: CoroutineScope) {
                             model.handle(Event.WakeUp)
                         // keep showing the reaction until it is over
                         model.state.type == PetStateType.DELETED -> {}
+                        model.state.type == PetStateType.HAPPY && now >= happyUntilMillis ->
+                            model.handle(Event.WakeUp)
+                        // keep showing the reaction until it is over
+                        model.state.type == PetStateType.HAPPY -> {}
                         // sleep takes priority over idling
                         model.state.type != PetStateType.SLEEPING && quietFor >= timeouts.sleepAfter ->
                             model.handle(Event.Sleep)
@@ -61,6 +67,10 @@ class DuckService(scope: CoroutineScope) {
                 Event.Deleted -> {
                     lastActivityMillis = now
                     deletedUntilMillis = now + timeouts.deletedFor.inWholeMilliseconds
+                }
+                Event.BuildSucceeded, Event.TestsPassed -> {
+                    lastActivityMillis = now
+                    happyUntilMillis = now + timeouts.happyFor.inWholeMilliseconds
                 }
                 else -> {}
             }

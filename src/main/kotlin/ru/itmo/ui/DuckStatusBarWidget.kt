@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.ui
 
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
@@ -10,7 +10,9 @@ import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.CoroutineScope
+import ru.itmo.config.MyMessageBundle
 import ru.itmo.pet.PetStateType
+import ru.itmo.service.DuckService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.awt.Dimension

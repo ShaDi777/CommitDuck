@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.ui
 
 import com.intellij.ui.scale.JBUIScale
 import java.awt.Graphics2D
@@ -25,9 +25,11 @@ class DuckAnimation private constructor(
     private val columns: Int,
 ) {
     /** Paints [frame] with its top-left corner at ([x], [y]), sized `JBUI.scale(frameWidth) x JBUI.scale(frameHeight)`. */
-    fun paintFrame(g: Graphics2D, frame: Int, x: Int, y: Int) {
-        val width = JBUIScale.scale(frameWidth)
-        val height = JBUIScale.scale(frameHeight)
+    fun paintFrame(g: Graphics2D, frame: Int, x: Int, y: Int) =
+        paintFrame(g, frame, x, y, JBUIScale.scale(frameWidth), JBUIScale.scale(frameHeight))
+
+    /** Paints [frame] scaled to [width] x [height] pixels (in the coordinate space of [g]) with its top-left at ([x], [y]). */
+    fun paintFrame(g: Graphics2D, frame: Int, x: Int, y: Int, width: Int, height: Int) {
         val useHiDpi = JBUIScale.sysScale(g) * JBUIScale.scale(1f) > 1.01f
         val image = if (useHiDpi) sheet2x else sheet
         val factor = if (useHiDpi) 2 else 1

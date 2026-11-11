@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.ui
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -6,6 +6,7 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.content.ContentFactory
+import ru.itmo.config.MyMessageBundle
 import javax.swing.JButton
 import kotlin.random.Random
 

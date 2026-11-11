@@ -12,6 +12,9 @@ abstract class PetBaseState : PetState {
         is Event.Activity -> WorkingState()
         // deleting files is activity too; the deleted reaction returns to the previous state
         Event.Deleted -> DeletedState(this)
+        // a successful build or test run cheers the duck up for a moment
+        Event.BuildSucceeded -> HappyState(this)
+        Event.TestsPassed -> HappyState(this)
         // States that need sprites the duck doesn't have yet are commented out:
         // Event.DuckClicked -> HappyState()
         // Event.Commit -> HappyState()

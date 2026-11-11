@@ -11,8 +11,8 @@ enum class PetStateType(val displayName: String) {
     WORKING("Working"),
     SLEEPING("Sleeping"),
     DELETED("Deleted"),
+    HAPPY("Happy"),
     // Not implemented with sprites yet — uncomment once the duck has a sprite for them:
-    // HAPPY("Happy"),
     // SAD("Sad"),
     ;
 

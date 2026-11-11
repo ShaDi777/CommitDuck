@@ -31,6 +31,12 @@ sealed interface Event {
     /** A commit was created or a task finished. */
     data object Commit : Event
 
+    /** A project build finished without errors. */
+    data object BuildSucceeded : Event
+
+    /** A test run finished with all tests passing. */
+    data object TestsPassed : Event
+
     /** An activity milestone (e.g. 1 000 / 10 000 characters) was reached. */
     data class ThresholdReached(val chars: Long) : Event
 

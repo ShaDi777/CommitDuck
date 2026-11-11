@@ -13,6 +13,7 @@
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
@@ -22,16 +23,23 @@
         <!-- If the plugin is published on JetBrains Marketplace, errors reported by users are available on the plugin page.
              See https://plugins.jetbrains.com/docs/marketplace/error-handler.html#developers-side for details. -->
         <errorHandler implementation="com.intellij.diagnostic.JetBrainsMarketplaceErrorReportSubmitter"/>
-        <toolWindow id="MyToolWindow" factoryClass="ru.itmo.MyToolWindowFactory"
+        <toolWindow id="MyToolWindow" factoryClass="ru.itmo.ui.MyToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
-        <statusBarWidgetFactory id="CommitDuck" implementation="ru.itmo.DuckStatusBarWidgetFactory"/>
-        <applicationConfigurable parentId="tools" instance="ru.itmo.DuckConfigurable"
+        <toolWindow id="Duck" factoryClass="ru.itmo.ui.DuckToolWindowFactory"
+                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+        <statusBarWidgetFactory id="CommitDuck" implementation="ru.itmo.ui.DuckStatusBarWidgetFactory"/>
+        <applicationConfigurable parentId="tools" instance="ru.itmo.config.DuckConfigurable"
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
+        <testStatusListener implementation="ru.itmo.listener.DuckTestListener"/>
     </extensions>
 
     <applicationListeners>
-        <listener class="ru.itmo.DuckActivityListener" topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
-        <listener class="ru.itmo.DuckFileDeleteListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener class="ru.itmo.listener.DuckActivityListener" topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
+        <listener class="ru.itmo.listener.DuckFileDeleteListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>
-    
+
+    <projectListeners>
+        <listener class="ru.itmo.listener.DuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+    </projectListeners>
+
 </idea-plugin>

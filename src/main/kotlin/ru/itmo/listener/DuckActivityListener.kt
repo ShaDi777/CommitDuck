@@ -1,4 +1,4 @@
-package ru.itmo
+package ru.itmo.listener
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.ex.AnActionListener
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
 import ru.itmo.pet.Event
+import ru.itmo.service.DuckService
 
 /** Edits that don't go through [afterEditorTyping] because they are actions, not typed characters. */
 private val EDITING_ACTIONS = setOf(
