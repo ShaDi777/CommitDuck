@@ -8,6 +8,7 @@ import ru.itmo.pet.Event
  */
 abstract class PetBaseState : PetState {
     override fun handle(event: Event): PetState = when (event) {
+        Event.FirstLaunch -> FirstLaunchState()
         // any activity puts the duck (back) to work
         is Event.Activity -> WorkingState()
         // deleting files is activity too; the deleted reaction returns to the previous state

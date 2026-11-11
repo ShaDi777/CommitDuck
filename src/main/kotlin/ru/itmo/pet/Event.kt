@@ -10,6 +10,8 @@ package ru.itmo.pet
  */
 sealed interface Event {
 
+    data object FirstLaunch : Event
+
     /** The user performed some activity; [typedChars] is the number of characters typed. */
     data class Activity(val typedChars: Int = 0) : Event
 

@@ -9,8 +9,7 @@ class IdleState : PetBaseState() {
 
     override fun handleSpecific(event: Event): PetState = when (event) {
         Event.Sleep -> SleepState()
-        // Requires the (not yet implemented) SadState:
-        // Event.IdleExtended -> SadState()
+        Event.IdleExtended -> SadState()
         else -> this
     }
 }
