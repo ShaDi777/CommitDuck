@@ -58,15 +58,15 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
     }
 
     /** Sends the user's message. Ignored while the duck is still answering the previous one. */
-    fun send(text: String, attachment: CodeAttachment?) {
+    fun send(text: String, attachment: CodeAttachment?, problems: List<IdeProblem> = emptyList()) {
         val trimmed = text.trim()
-        if (trimmed.isEmpty() && attachment?.code == null) return
+        if (trimmed.isEmpty() && attachment?.code == null && problems.isEmpty()) return
         if (mutableState.value.thinking) return
 
         // talking to the duck is activity too: the duck in the status bar wakes up and works along
         DuckService.getInstance().handle(Event.Activity())
 
-        val message = ChatMessage(ChatRole.USER, trimmed, attachment)
+        val message = ChatMessage(ChatRole.USER, trimmed, attachment, problems = problems)
         val newState = mutableState.updateAndGet { it.copy(messages = it.messages + message, thinking = true) }
         answerJob = scope.launch {
             val answer = try {
@@ -130,7 +130,7 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
     }
 
     private fun localAnswer(message: ChatMessage): ChatMessage {
-        val reply = synchronized(localDuck) { localDuck.reply(message.text, message.attachment) }
+        val reply = synchronized(localDuck) { localDuck.reply(message.text, message.attachment, message.problems) }
         return ChatMessage(ChatRole.DUCK, reply.text)
     }
 

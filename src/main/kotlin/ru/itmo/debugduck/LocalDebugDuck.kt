@@ -3,7 +3,7 @@ package ru.itmo.debugduck
 import kotlin.random.Random
 
 /** Why the local duck picked a reply; useful for tests and for tuning the question pool. */
-enum class ReplyKind { GREETING, SOLVED, THANKS, CODE, FILE, STUCK, TOPIC, PHASE, GENERIC }
+enum class ReplyKind { GREETING, SOLVED, THANKS, PROBLEM, CODE, FILE, STUCK, TOPIC, PHASE, GENERIC }
 
 data class LocalReply(val text: String, val kind: ReplyKind, val topic: DebugTopic? = null)
 
@@ -13,7 +13,9 @@ data class LocalReply(val text: String, val kind: ReplyKind, val topic: DebugTop
  * Without an LLM the duck can't understand the problem, so it follows a classic debugging checklist
  * ([DebugPhase]: expected vs. actual -> reproduce -> what changed -> locate -> assumptions -> experiment -> explain)
  * and adds light, topic-specific hints when the user's message mentions a well-known kind of bug ([DebugTopic]),
- * e.g. a null value, a failing test or a slow query. Questions are not repeated within one conversation.
+ * e.g. a null value, a failing test or a slow query. Errors reported by the IDE ([IdeProblem]) are quoted back and
+ * pick the topic too, so "I have a CE" plus the compiler message gets compile-error hints right away.
+ * Questions are not repeated within one conversation.
  *
  * Pure Kotlin without IDE dependencies, so it can be unit-tested with a seeded [random].
  */
@@ -29,13 +31,15 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
 
     fun greeting(): LocalReply = LocalReply(GREETINGS.random(random), ReplyKind.GREETING)
 
-    fun reply(userText: String, attachment: CodeAttachment? = null): LocalReply {
+    fun reply(userText: String, attachment: CodeAttachment? = null, problems: List<IdeProblem> = emptyList()): LocalReply {
         val text = userText.lowercase()
         DebugPhase.entries.filterTo(coveredPhases) { it.isAnsweredBy(text) }
-        val mentionedTopics = DebugTopic.entries.filter { it.matches(text) }
+        val problemTopics = topicsOf(problems)
+        val mentionedTopics = DebugTopic.entries.filter { it in problemTopics || it.matches(text) }
         if (mainTopics.isEmpty()) mainTopics += mentionedTopics
         val reply = solvedReply(text)
             ?: thanksReply(text)
+            ?: problemReply(problems, mentionedTopics)
             ?: attachmentReply(attachment)
             ?: stuckReply(text)
             ?: topicReply(mentionedTopics)
@@ -63,6 +67,30 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
         // "thanks, but the test still fails" is not the end of the conversation
         if (!THANKS.matches(text) || text.split(WHITESPACE).size > 6) return null
         return LocalReply(pickCycling(THANKS_REPLIES), ReplyKind.THANKS)
+    }
+
+    /** Quotes the first new IDE problem and follows up with a hint for its topic. */
+    private fun problemReply(problems: List<IdeProblem>, mentionedTopics: List<DebugTopic>): LocalReply? {
+        val problem = problems.firstOrNull() ?: return null
+        val message = problem.message.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty().let {
+            if (it.length > MAX_QUOTE_LENGTH) it.take(MAX_QUOTE_LENGTH) + "..." else it
+        }
+        val quote = when (problem.kind) {
+            ProblemKind.CODE, ProblemKind.BUILD ->
+                if (problem.location != null) "The IDE reports an error at ${problem.location}: \"$message\"."
+                else "The IDE reports an error: \"$message\"."
+            ProblemKind.TEST ->
+                if (problem.location != null) "The test ${problem.location} failed: \"$message\"."
+                else "A test failed: \"$message\"."
+        }
+        val more = if (problems.size > 1) " (and ${problems.size - 1} more)" else ""
+        // new information from the IDE beats the alternation of hints and checklist questions
+        for (topic in mentionedTopics) {
+            val hint = pickUnasked(topic.hints) ?: continue
+            return LocalReply("$quote$more $hint", ReplyKind.PROBLEM, topic)
+        }
+        val question = phaseReply(acknowledge = false)?.text ?: genericReply(acknowledge = false).text
+        return LocalReply("$quote$more $question", ReplyKind.PROBLEM)
     }
 
     private fun attachmentReply(attachment: CodeAttachment?): LocalReply? {
@@ -97,18 +125,19 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
         return null
     }
 
-    private fun phaseReply(): LocalReply? {
+    private fun phaseReply(acknowledge: Boolean = true): LocalReply? {
         val phases = DebugPhase.entries
         while (phaseIndex < phases.size) {
             val phase = phases[phaseIndex++]
             if (phase in coveredPhases) continue
             val question = pickUnasked(phase.questions)
-            if (question != null) return LocalReply(acknowledge() + question, ReplyKind.PHASE)
+            if (question != null) return LocalReply((if (acknowledge) acknowledge() else "") + question, ReplyKind.PHASE)
         }
         return null
     }
 
-    private fun genericReply() = LocalReply(acknowledge() + pickCycling(GENERIC_QUESTIONS), ReplyKind.GENERIC)
+    private fun genericReply(acknowledge: Boolean = true) =
+        LocalReply((if (acknowledge) acknowledge() else "") + pickCycling(GENERIC_QUESTIONS), ReplyKind.GENERIC)
 
     private fun acknowledge(): String {
         val acknowledgement = ACKNOWLEDGEMENTS.filter { it.isEmpty() || it != lastAcknowledgement }.random(random)
@@ -129,6 +158,17 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
 
     private companion object {
         val WHITESPACE = Regex("\\s+")
+        const val MAX_QUOTE_LENGTH = 160
+
+        /** Topics suggested by IDE problems: compile errors for code and build errors, tests for test failures, plus
+         *  whatever the error text itself mentions (a `NullPointerException` in a failed test is a null problem). */
+        fun topicsOf(problems: List<IdeProblem>): Set<DebugTopic> = buildSet {
+            for (problem in problems) {
+                add(if (problem.kind == ProblemKind.TEST) DebugTopic.TEST else DebugTopic.COMPILE_ERROR)
+                val text = (problem.message + "\n" + problem.details.orEmpty()).lowercase()
+                DebugTopic.entries.filterTo(this) { it != DebugTopic.COMPILE_ERROR && it.matches(text) }
+            }
+        }
 
         val GREETINGS = listOf(
             "Quack! I'm your debug duck. Tell me what's going wrong - explaining a problem out loud is often half of the fix.",

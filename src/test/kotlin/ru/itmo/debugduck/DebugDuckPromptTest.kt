@@ -72,6 +72,31 @@ class DebugDuckPromptTest {
     }
 
     @Test
+    fun `includes IDE problems with their details`() {
+        val message = ChatMessage(
+            ChatRole.USER, "why?",
+            CodeAttachment.of("Main.java", "JAVA", "int x = 1", startLine = 13),
+            problems = listOf(
+                IdeProblem(ProblemKind.CODE, "';' expected", "Main.java:13"),
+                IdeProblem(ProblemKind.TEST, "expected:<2> but was:<3>", "MainTest.adds", details = "at MainTest.adds(MainTest.java:7)"),
+            ),
+        )
+        assertEquals(
+            "why?\n\nCode from Main.java:13 (JAVA):\n```java\nint x = 1\n```\n\n" +
+                "Problems reported by the IDE:\n- Error Main.java:13: ';' expected\n" +
+                "- Failed test MainTest.adds: expected:<2> but was:<3>\n```\nat MainTest.adds(MainTest.java:7)\n```",
+            DebugDuckPrompt.userContent(message),
+        )
+    }
+
+    @Test
+    fun `cuts long stack traces`() {
+        val details = IdeProblem.details((1..40).joinToString("\n") { "\tat Frame$it" })!!
+        assertEquals(IdeProblem.MAX_DETAIL_LINES + 1, details.lines().size)
+        assertTrue(details, details.endsWith("(25 more lines)"))
+    }
+
+    @Test
     fun `truncates long selections`() {
         val attachment = CodeAttachment.of("Big.kt", "Kotlin", "x".repeat(CodeAttachment.MAX_CODE_LENGTH + 100))
         assertTrue(attachment.code!!.length < CodeAttachment.MAX_CODE_LENGTH + 50)

@@ -43,21 +43,41 @@ object DebugDuckPrompt {
         return listOf(LlmMessage(LlmMessage.SYSTEM, SYSTEM_PROMPT)) + conversation
     }
 
-    /** The user's text plus the attached code, formatted as Markdown so the model sees the file and language. */
+    /**
+     * The user's text plus the attached code and the errors reported by the IDE, formatted as Markdown so the model
+     * sees the file, the language and the exact error messages.
+     */
     fun userContent(message: ChatMessage): String {
-        val attachment = message.attachment ?: return message.text
-        val code = attachment.code
-        val context = if (code == null) {
-            "(The file currently open in my editor is ${attachment.fileName}.)"
+        val parts = mutableListOf<String>()
+        if (message.text.isNotBlank()) parts += message.text
+        message.attachment?.let { parts += attachmentContent(it) }
+        if (message.problems.isNotEmpty()) parts += problemsContent(message.problems)
+        return parts.joinToString("\n\n")
+    }
+
+    private fun attachmentContent(attachment: CodeAttachment): String {
+        val code = attachment.code ?: return "(The file currently open in my editor is ${attachment.fileName}.)"
+        val language = attachment.language?.takeUnless { it.equals("Plain text", ignoreCase = true) }
+        val fence = fenceFor(code)
+        val tag = language?.lowercase()?.filter { it.isLetterOrDigit() || it == '+' || it == '#' }.orEmpty()
+        val title = "Code from ${attachment.location}" + (language?.let { " ($it)" } ?: "") + ":"
+        return "$title\n$fence$tag\n$code\n$fence"
+    }
+
+    private fun problemsContent(problems: List<IdeProblem>): String = buildString {
+        append("Problems reported by the IDE:")
+        for (problem in problems) {
+            val prefix = when (problem.kind) {
+                ProblemKind.CODE -> "Error"
+                ProblemKind.BUILD -> "Build error"
+                ProblemKind.TEST -> "Failed test"
+            }
+            append("\n- ").append(prefix).append(' ').append(problem.summary)
+            problem.details?.let { details ->
+                val fence = fenceFor(details)
+                append("\n").append(fence).append('\n').append(details).append('\n').append(fence)
+            }
         }
-        else {
-            val language = attachment.language?.takeUnless { it.equals("Plain text", ignoreCase = true) }
-            val fence = fenceFor(code)
-            val tag = language?.lowercase()?.filter { it.isLetterOrDigit() || it == '+' || it == '#' }.orEmpty()
-            val title = "Code from ${attachment.fileName}" + (language?.let { " ($it)" } ?: "") + ":"
-            "$title\n$fence$tag\n$code\n$fence"
-        }
-        return if (message.text.isBlank()) context else "${message.text}\n\n$context"
     }
 
     /** A Markdown fence longer than any run of backticks inside [code], so the code can't close it early. */

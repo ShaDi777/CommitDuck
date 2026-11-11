@@ -25,6 +25,7 @@ import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import ru.itmo.config.DuckConfigurable
+import ru.itmo.config.DuckSettings
 import ru.itmo.config.MyMessageBundle
 import java.awt.BorderLayout
 import java.awt.Color
@@ -136,12 +137,20 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         // so the chat isn't cluttered and the requests don't grow with every message
         val attachment = if (attachSelection.isSelected) currentAttachment()?.takeUnless { it.isAlreadySent() } else null
         if (input.text.isBlank() && attachment?.code == null) return
-        service.send(input.text, attachment)
+        service.send(input.text, attachment, newIdeProblems())
         input.text = ""
         input.requestFocusInWindow()
     }
 
     private fun CodeAttachment.isAlreadySent() = service.state.value.messages.any { it.attachment == this }
+
+    /** Errors from the editor, the last build and the last test run that the duck hasn't seen in this conversation. */
+    private fun newIdeProblems(): List<IdeProblem> {
+        if (!DuckSettings.getInstance().state.shareIdeProblems) return emptyList()
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor
+        val alreadySent = service.state.value.messages.flatMapTo(HashSet()) { it.problems }
+        return DebugDuckContext.getInstance(project).currentProblems(editor).filterNot { it in alreadySent }
+    }
 
     /**
      * The selection in the active editor, or just the file name if nothing is selected.

@@ -53,8 +53,11 @@ object ChatHtml {
             append(formatText(message.text))
         }
         message.attachment?.let { attachment ->
-            append("<div class=\"file\">").append(escape(attachment.fileName)).append("</div>")
+            append("<div class=\"file\">").append(escape(attachment.location)).append("</div>")
             attachment.code?.let { append("<pre>").append(escape(it)).append("</pre>") }
+        }
+        for (problem in message.problems) {
+            append("<div class=\"problem\">").append(escape(problem.summary)).append("</div>")
         }
         append("</div>")
     }
@@ -110,6 +113,7 @@ object ChatHtml {
             div.notice { background-color: ${palette.noticeBackground}; color: ${palette.noticeText}; padding: 6px 8px; margin: 0 0 8px 0; }
             div.who { color: ${palette.secondaryText}; font-weight: bold; margin-bottom: 2px; }
             div.file { color: ${palette.secondaryText}; margin-top: 4px; }
+            div.problem { color: ${palette.noticeText}; margin-top: 4px; }
             pre { font-family: $codeFont; background-color: ${palette.codeBackground}; padding: 4px; margin: 4px 0 0 0; }
             code { font-family: $codeFont; background-color: ${palette.codeBackground}; }
         """.trimIndent()

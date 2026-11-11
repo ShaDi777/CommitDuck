@@ -25,6 +25,21 @@ class ChatHtmlTest {
     }
 
     @Test
+    fun `shows IDE problems and the selected lines`() {
+        val html = ChatHtml.render(
+            listOf(
+                ChatMessage(
+                    ChatRole.USER, "why?", CodeAttachment.of("A.kt", "Kotlin", "a\nb", startLine = 5),
+                    problems = listOf(IdeProblem(ProblemKind.CODE, "Unresolved reference: <foo>", "A.kt:6")),
+                )
+            ),
+            thinking = false, palette, labels,
+        )
+        assertTrue(html, "<div class=\"file\">A.kt:5-6</div>" in html)
+        assertTrue(html, "<div class=\"problem\">A.kt:6: Unresolved reference: &lt;foo&gt;</div>" in html)
+    }
+
+    @Test
     fun `turns newlines into line breaks`() {
         assertEquals("<div>a<br>b</div>", ChatHtml.formatText("a\nb"))
     }

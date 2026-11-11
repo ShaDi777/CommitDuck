@@ -52,6 +52,8 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var llmApiUrl by string(DEFAULT_LLM_API_URL)
         var llmModel by string(DEFAULT_LLM_MODEL)
         var llmTimeoutSeconds by property(60)
+        /** Debug Duck: send errors from the editor, the last build and the last test run along with messages. */
+        var shareIdeProblems by property(true)
     }
 
     fun timeouts() = DuckTimeouts(
@@ -117,6 +119,11 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
             }
 
             group(MyMessageBundle.message("settings.duck.llm.group")) {
+                row {
+                    checkBox(MyMessageBundle.message("settings.duck.share.problems"))
+                        .bindSelected(options::shareIdeProblems)
+                        .comment(MyMessageBundle.message("settings.duck.share.problems.comment"))
+                }
                 row {
                     checkBox(MyMessageBundle.message("settings.duck.llm.enabled"))
                         .bindSelected(options::llmEnabled)

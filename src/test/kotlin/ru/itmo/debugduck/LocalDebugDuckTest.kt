@@ -66,6 +66,41 @@ class LocalDebugDuckTest {
     }
 
     @Test
+    fun `quotes an IDE error and gives a hint for it`() {
+        val reply = duck.reply("why?", problems = listOf(IdeProblem(ProblemKind.CODE, "';' expected", "Main.java:13")))
+        assertEquals(ReplyKind.PROBLEM, reply.kind)
+        assertEquals(DebugTopic.COMPILE_ERROR, reply.topic)
+        assertTrue(reply.text, "Main.java:13" in reply.text && "';' expected" in reply.text)
+        assertTrue(reply.text, DebugTopic.COMPILE_ERROR.hints.any { reply.text.endsWith(it) })
+    }
+
+    @Test
+    fun `picks the topic from the text of a failed test`() {
+        val failure = IdeProblem(
+            ProblemKind.TEST, "Cannot invoke \"String.length()\" because \"s\" is null", "ParserTest.parsesEmptyLine",
+            details = "java.lang.NullPointerException: Cannot invoke ...\n\tat Parser.parse(Parser.java:12)",
+        )
+        val reply = duck.reply("the test is red", problems = listOf(failure))
+        assertEquals(ReplyKind.PROBLEM, reply.kind)
+        assertEquals(DebugTopic.NULL_VALUE, reply.topic)
+        assertTrue(reply.text, reply.text.startsWith("The test ParserTest.parsesEmptyLine failed"))
+    }
+
+    @Test
+    fun `new IDE errors are answered even right after a hint`() {
+        assertEquals(ReplyKind.TOPIC, duck.reply("my test fails").kind)
+        val reply = duck.reply("and now this", problems = listOf(IdeProblem(ProblemKind.BUILD, "cannot find symbol", "A.java:3")))
+        assertEquals(ReplyKind.PROBLEM, reply.kind)
+        assertTrue(reply.text, "A.java:3" in reply.text)
+    }
+
+    @Test
+    fun `counts the other IDE errors`() {
+        val problems = List(3) { IdeProblem(ProblemKind.CODE, "error $it", "A.kt:${it + 1}") }
+        assertTrue(duck.reply("help", problems = problems).text.contains("(and 2 more)"))
+    }
+
+    @Test
     fun `short keywords match whole words only`() {
         assertTrue(DebugTopic.USER_INTERFACE.matches("the ui is broken"))
         assertFalse(DebugTopic.USER_INTERFACE.matches("the build is broken"))

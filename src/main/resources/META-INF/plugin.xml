@@ -34,6 +34,7 @@
         <applicationConfigurable parentId="tools" instance="ru.itmo.config.DuckConfigurable"
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
         <testStatusListener implementation="ru.itmo.listener.DuckTestListener"/>
+        <testStatusListener implementation="ru.itmo.debugduck.DebugDuckTestListener"/>
     </extensions>
 
     <applicationListeners>
@@ -43,6 +44,7 @@
 
     <projectListeners>
         <listener class="ru.itmo.listener.DuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+        <listener class="ru.itmo.debugduck.DebugDuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
     </projectListeners>
 
 </idea-plugin>
