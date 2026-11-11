@@ -20,7 +20,7 @@ abstract class PetBaseState : PetState {
         Event.ProblemSolved -> HappyState(this)
         // States that need sprites the duck doesn't have yet are commented out:
         // Event.DuckClicked -> HappyState()
-        // Event.Commit -> HappyState()
+        Event.Commit -> HappyState(this)
         // is Event.ThresholdReached -> HappyState()
         else -> handleSpecific(event)
     }
