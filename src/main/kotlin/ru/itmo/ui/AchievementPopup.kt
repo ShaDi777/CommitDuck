@@ -10,6 +10,7 @@ import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import ru.itmo.achievement.AchievementType
+import ru.itmo.config.MyMessageBundle
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Cursor
@@ -119,9 +120,7 @@ class AchievementPopup(
             isOpaque = false
         }
 
-        val heading = JLabel(
-            "●  ДОСТИЖЕНИЕ РАЗБЛОКИРОВАНО"
-        ).apply {
+        val heading = JLabel(MyMessageBundle.message("achievement.new_achievement_title")).apply {
             font = JBFont.label().deriveFont(
                 Font.BOLD,
                 JBUI.scale(10).toFloat()
