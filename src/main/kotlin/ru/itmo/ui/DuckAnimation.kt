@@ -40,9 +40,19 @@ class DuckAnimation private constructor(
         val g2 = g.create() as Graphics2D
         try {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-            g2.drawImage(image, x, y, x + width, y + height, sx, sy, sx + frameWidth * factor, sy + frameHeight * factor, null)
-        }
-        finally {
+            g2.drawImage(
+                image,
+                x,
+                y,
+                x + width,
+                y + height,
+                sx,
+                sy,
+                sx + frameWidth * factor,
+                sy + frameHeight * factor,
+                null
+            )
+        } finally {
             g2.dispose()
         }
     }
@@ -51,18 +61,24 @@ class DuckAnimation private constructor(
         private val cache = ConcurrentHashMap<String, DuckAnimation>()
 
         /** @param state lowercase state name, e.g. `idle`; @param size sprite size directory, e.g. `status` */
-        fun load(state: String, size: String): DuckAnimation = cache.computeIfAbsent("$size/$state") { path ->
-            val properties = Properties().apply { resource("/duck/$path.properties").use { load(it) } }
-            DuckAnimation(
-                sheet = resource("/duck/$path.png").use { ImageIO.read(it) },
-                sheet2x = resource("/duck/$path@2x.png").use { ImageIO.read(it) },
-                frameCount = properties.getProperty("frameCount").toInt(),
-                fps = properties.getProperty("fps").toInt(),
-                frameWidth = properties.getProperty("frameWidth").toInt(),
-                frameHeight = properties.getProperty("frameHeight").toInt(),
-                columns = properties.getProperty("columns").toInt(),
-            )
-        }
+        fun load(state: String, size: String = "status"): DuckAnimation =
+            cache.computeIfAbsent("$size/$state") { _ ->
+                val path = "$size/$state"
+                val properties = Properties().apply {
+                    resource("/duck/$path/animation.properties").use {
+                        load(it)
+                    }
+                }
+                DuckAnimation(
+                    sheet = resource("/duck/$path/animation.png").use { ImageIO.read(it) },
+                    sheet2x = resource("/duck/$path/animation@2x.png").use { ImageIO.read(it) },
+                    frameCount = properties.getProperty("frameCount").toInt(),
+                    fps = properties.getProperty("fps").toInt(),
+                    frameWidth = properties.getProperty("frameWidth").toInt(),
+                    frameHeight = properties.getProperty("frameHeight").toInt(),
+                    columns = properties.getProperty("columns").toInt(),
+                )
+            }
 
         private fun resource(path: String) =
             DuckAnimation::class.java.getResourceAsStream(path) ?: error("Duck animation resource not found: $path")

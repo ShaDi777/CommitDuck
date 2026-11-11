@@ -15,6 +15,7 @@ import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import ru.itmo.statistics.DuckStatistics
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.Messages
@@ -69,6 +70,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var happyForSeconds by property(5)
         var isFirstLaunch by property(true)
         var quackOnClick by property(true)
+        var typedChars by property(0)
 
         /** Debug Duck: answer with a language model instead of the built-in questions. */
         var llmEnabled by property(false)

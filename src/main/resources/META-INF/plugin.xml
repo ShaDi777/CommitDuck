@@ -32,16 +32,30 @@
         <toolWindow id="DebugDuck" factoryClass="ru.itmo.debugduck.DebugDuckToolWindowFactory"
                     anchor="right" icon="/icons/debugDuck.svg"/>
         <statusBarWidgetFactory id="CommitDuck" implementation="ru.itmo.ui.DuckStatusBarWidgetFactory"/>
+
         <applicationConfigurable parentId="tools" instance="ru.itmo.config.DuckConfigurable"
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
+
+        <applicationConfigurable
+                id="ru.itmo.config.DuckStatisticsConfigurable"
+                displayName="Commit Duck Statistics"
+                parentId="ru.itmo.commit-duck.settings"
+                instance="ru.itmo.config.DuckStatisticsConfigurable"/>
+
         <testStatusListener implementation="ru.itmo.listener.DuckTestListener"/>
         <testStatusListener implementation="ru.itmo.debugduck.DebugDuckTestListener"/>
         <checkinHandlerFactory implementation="ru.itmo.listener.DuckCommitListener"/>
+
+        <notificationGroup
+                id="Commit Duck Achievements"
+                displayType="BALLOON"/>
     </extensions>
 
     <applicationListeners>
-        <listener class="ru.itmo.listener.DuckActivityListener" topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
-        <listener class="ru.itmo.listener.DuckFileDeleteListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
+        <listener class="ru.itmo.listener.DuckActivityListener"
+                  topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
+        <listener class="ru.itmo.listener.DuckFileDeleteListener"
+                  topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>
 
     <actions>
@@ -52,8 +66,10 @@
     </actions>
 
     <projectListeners>
-        <listener class="ru.itmo.listener.DuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
-        <listener class="ru.itmo.debugduck.DebugDuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+        <listener class="ru.itmo.listener.DuckBuildListener"
+                  topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+        <listener class="ru.itmo.debugduck.DebugDuckBuildListener"
+                  topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
     </projectListeners>
 
 </idea-plugin>

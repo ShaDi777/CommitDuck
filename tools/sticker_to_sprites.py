@@ -26,7 +26,10 @@ DEFAULT_OUT = Path(__file__).resolve().parent.parent / "src" / "main" / "resourc
 RENDER_SIZE = 512
 # name -> frame height in logical (1x) pixels.
 # Add e.g. "large": 128 when the tool window needs a big duck (costs ~3 MB per state).
-SIZES = {"status": 18}
+SIZES = {
+    "status": 18,
+    "popup": 72,
+}
 # keep sheets well below common image size limits
 MAX_SHEET_WIDTH = 4096
 LIGHT_BG = (255, 255, 255, 255)
@@ -91,12 +94,12 @@ def convert(sticker: Path, out: Path, fps: int, preview: Optional[Path]) -> None
     for name, height in SIZES.items():
         frame_w, frame_h = round(height * aspect), height
         columns = min(len(frames), MAX_SHEET_WIDTH // (frame_w * 2))
-        target = out / name
+        target = out / name / state
         target.mkdir(parents=True, exist_ok=True)
         for scale, suffix in ((1, ""), (2, "@2x")):
             sheet = build_sheet(frames, frame_w * scale, frame_h * scale, columns)
-            sheet.save(target / f"{state}{suffix}.png", optimize=True)
-        (target / f"{state}.properties").write_text(
+            sheet.save(target / f"animation{suffix}.png", optimize=True)
+        (target / "animation.properties").write_text(
             f"frameCount={len(frames)}\n"
             f"fps={fps}\n"
             f"frameWidth={frame_w}\n"
@@ -111,14 +114,51 @@ def convert(sticker: Path, out: Path, fps: int, preview: Optional[Path]) -> None
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("stickers", type=Path, nargs="+", help="input .tgs files named after states, e.g. idle.tgs")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output directory (default: src/main/resources/duck)")
-    parser.add_argument("--fps", type=int, default=30, help="output frame rate (default: 30)")
-    parser.add_argument("--preview", type=Path, help="optional directory for a light/dark GIF preview")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "stickers",
+        type=Path,
+        nargs="+",
+        help="Input .tgs files or directories containing .tgs files"
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=DEFAULT_OUT,
+        help="Output directory (default: src/main/resources/duck)"
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=30,
+        help="Output frame rate (default: 30)"
+    )
+    parser.add_argument(
+        "--preview",
+        type=Path,
+        help="Optional directory for light/dark GIF previews"
+    )
+
     args = parser.parse_args()
 
-    for sticker in args.stickers:
+    stickers = []
+
+    for path in args.stickers:
+        if path.is_dir():
+            stickers.extend(sorted(path.glob("*.tgs")))
+        elif path.is_file() and path.suffix.lower() == ".tgs":
+            stickers.append(path)
+        else:
+            parser.error(f"Not a .tgs file or directory: {path}")
+
+    if not stickers:
+        parser.error("No .tgs files found")
+
+    for sticker in stickers:
+        print(f"\nProcessing: {sticker}")
         convert(sticker, args.out, args.fps, args.preview)
 
 
