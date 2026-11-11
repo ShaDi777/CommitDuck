@@ -139,7 +139,6 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
 
     override fun createPanel(): DialogPanel {
         val options = DuckSettings.getInstance().state
-        val statistics = DuckStatistics.getInstance()
         val credentials = DebugDuckCredentials.getInstance()
         return panel {
             row(MyMessageBundle.message("settings.duck.idle.after")) {
@@ -164,10 +163,6 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
             }
             row {
                 checkBox(MyMessageBundle.message("settings.duck.quack.on.click")).bindSelected(options::quackOnClick)
-            }
-
-            row("Statistics") {
-                label("Characters entered: ${statistics.typedChars.value}")
             }
 
             group(MyMessageBundle.message("settings.duck.llm.group")) {
