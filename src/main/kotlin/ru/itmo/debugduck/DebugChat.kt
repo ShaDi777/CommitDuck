@@ -92,3 +92,32 @@ data class ChatMessage(
     /** For [ChatRole.USER]: errors from the IDE sent along with the message. */
     val problems: List<IdeProblem> = emptyList(),
 )
+
+/** Code and errors the user picked in the editor ("Ask Debug Duck"), waiting to be sent with the next message. */
+data class PendingContext(val attachment: CodeAttachment?, val problems: List<IdeProblem>) {
+    val isEmpty: Boolean
+        get() = attachment == null && problems.isEmpty()
+}
+
+/**
+ * Builds the user's next message from the typed [text], the [pending] context and the IDE problems found
+ * automatically ([autoProblems]). Problems the duck has already seen in [history] are left out, so the same error
+ * isn't sent again with every message. Returns `null` if there is nothing to send.
+ */
+fun composeUserMessage(
+    text: String,
+    pending: PendingContext?,
+    autoProblems: List<IdeProblem>,
+    history: List<ChatMessage>,
+): ChatMessage? {
+    val trimmed = text.trim()
+    val alreadySent = history.flatMapTo(HashSet()) { it.problems }
+    val problems = ((pending?.problems ?: emptyList()) + autoProblems)
+        .distinct()
+        .filterNot { it in alreadySent }
+        .take(IdeProblem.MAX_PER_MESSAGE)
+    val attachment = pending?.attachment
+    // problems found automatically don't make a message on their own, the user has to say or attach something
+    if (trimmed.isEmpty() && attachment == null && pending?.problems.isNullOrEmpty()) return null
+    return ChatMessage(ChatRole.USER, trimmed, attachment, problems = problems)
+}

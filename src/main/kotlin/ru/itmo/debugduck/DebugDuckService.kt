@@ -33,6 +33,8 @@ data class DebugDuckState(
     val thinking: Boolean = false,
     /** Changes with every new conversation, so a late answer can't end up in the next conversation. */
     val conversationId: Int = 0,
+    /** Code and errors picked with "Ask Debug Duck", sent with the next message. */
+    val pending: PendingContext? = null,
 )
 
 /**
@@ -57,17 +59,31 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
         Disposer.register(disposable) { job.cancel() }
     }
 
-    /** Sends the user's message. Ignored while the duck is still answering the previous one. */
-    fun send(text: String, attachment: CodeAttachment?, problems: List<IdeProblem> = emptyList()) {
-        val trimmed = text.trim()
-        if (trimmed.isEmpty() && attachment?.code == null && problems.isEmpty()) return
-        if (mutableState.value.thinking) return
+    /** Attaches code and errors from the editor to the next message, replacing what was attached before. */
+    fun attach(context: PendingContext) {
+        mutableState.update { it.copy(pending = context.takeUnless { context.isEmpty }) }
+    }
+
+    fun clearPending() {
+        mutableState.update { it.copy(pending = null) }
+    }
+
+    /**
+     * Sends the user's message with the pending context and the IDE problems found automatically ([autoProblems]).
+     * Ignored while the duck is still answering the previous message.
+     * @return whether a message was sent
+     */
+    fun send(text: String, autoProblems: List<IdeProblem> = emptyList()): Boolean {
+        val current = mutableState.value
+        if (current.thinking) return false
+        val message = composeUserMessage(text, current.pending, autoProblems, current.messages) ?: return false
 
         // talking to the duck is activity too: the duck in the status bar wakes up and works along
         DuckService.getInstance().handle(Event.Activity())
 
-        val message = ChatMessage(ChatRole.USER, trimmed, attachment, problems = problems)
-        val newState = mutableState.updateAndGet { it.copy(messages = it.messages + message, thinking = true) }
+        val newState = mutableState.updateAndGet {
+            it.copy(messages = it.messages + message, thinking = true, pending = null)
+        }
         answerJob = scope.launch {
             val answer = try {
                 answer(newState.messages, message)
@@ -84,13 +100,15 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
                 else it.copy(messages = it.messages + answer, thinking = false)
             }
         }
+        return true
     }
 
     /** Forgets the conversation (cancelling an answer in progress) and greets the user again. */
     fun newConversation() {
         answerJob?.cancel()
         synchronized(localDuck) { localDuck.reset() }
-        mutableState.update { DebugDuckState(listOf(greeting()), thinking = false, conversationId = it.conversationId + 1) }
+        // what the user just attached stays: they probably want to ask about it in the new conversation
+        mutableState.update { DebugDuckState(listOf(greeting()), conversationId = it.conversationId + 1, pending = it.pending) }
     }
 
     /** E.g. "Mode: language model (gpt-5-mini)", shown in the tool window. */

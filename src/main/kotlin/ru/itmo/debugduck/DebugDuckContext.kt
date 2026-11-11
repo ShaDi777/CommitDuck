@@ -41,23 +41,52 @@ class DebugDuckContext(private val project: Project) {
     }
 
     /** Problems in [editor] (if any), the last build and the last test run, at most [IdeProblem.MAX_PER_MESSAGE]. */
-    fun currentProblems(editor: Editor?): List<IdeProblem> =
-        ((editor?.let(::editorProblems) ?: emptyList()) + buildProblems + testProblems)
-            .distinct()
-            .take(IdeProblem.MAX_PER_MESSAGE)
+    fun currentProblems(editor: Editor?): List<IdeProblem> {
+        val inEditor = editor?.let {
+            val selection = it.selectionModel
+            if (selection.hasSelection()) editorProblems(it, selection.selectionStart, selection.selectionEnd)
+            else editorProblems(it, 0, it.document.textLength)
+        }
+        return ((inEditor ?: emptyList()) + buildProblems + testProblems).distinct().take(IdeProblem.MAX_PER_MESSAGE)
+    }
 
     /**
-     * Errors highlighted in [editor]: inside the selection if there is one, otherwise in the whole file, the ones
-     * nearest to the caret first. `runReadAction` is deprecated in the newest platform versions in favour of
-     * `runReadActionBlocking`, which older versions don't have; this is a short read on the EDT either way.
+     * What "Ask Debug Duck" sends: the selection, or a few lines around the caret if nothing is selected, with the
+     * errors highlighted there.
      */
     @Suppress("DEPRECATION")
-    fun editorProblems(editor: Editor): List<IdeProblem> = runReadAction {
+    fun editorContext(editor: Editor): PendingContext = runReadAction {
+        val document = editor.document
+        val file = FileDocumentManager.getInstance().getFile(document)
+        val selection = editor.selectionModel
+        val (start, end) = if (selection.hasSelection()) {
+            selection.selectionStart to selection.selectionEnd
+        }
+        else {
+            val caretLine = document.getLineNumber(editor.caretModel.offset)
+            val first = (caretLine - CONTEXT_LINES).coerceAtLeast(0)
+            val last = (caretLine + CONTEXT_LINES).coerceAtMost((document.lineCount - 1).coerceAtLeast(0))
+            document.getLineStartOffset(first) to document.getLineEndOffset(last)
+        }
+        val code = document.charsSequence.subSequence(start, end).toString()
+        val attachment = CodeAttachment.of(
+            fileName = file?.name ?: "untitled",
+            language = file?.fileType?.name,
+            selectedText = code,
+            startLine = document.getLineNumber(start) + 1,
+        )
+        PendingContext(attachment, editorProblems(editor, start, end))
+    }
+
+    /**
+     * Errors highlighted in [editor] between [start] and [end], the ones nearest to the caret first.
+     * `runReadAction` is deprecated in the newest platform versions in favour of `runReadActionBlocking`, which older
+     * versions don't have; this is a short read on the EDT either way.
+     */
+    @Suppress("DEPRECATION")
+    fun editorProblems(editor: Editor, start: Int, end: Int): List<IdeProblem> = runReadAction {
         val document = editor.document
         val fileName = FileDocumentManager.getInstance().getFile(document)?.name ?: "untitled"
-        val selection = editor.selectionModel
-        val start = if (selection.hasSelection()) selection.selectionStart else 0
-        val end = if (selection.hasSelection()) selection.selectionEnd else document.textLength
         val caret = editor.caretModel.offset
 
         val found = mutableListOf<Pair<Int, String>>()
@@ -75,6 +104,9 @@ class DebugDuckContext(private val project: Project) {
     }
 
     companion object {
+        /** Lines above and below the caret sent by "Ask Debug Duck" when nothing is selected. */
+        private const val CONTEXT_LINES = 3
+
         fun getInstance(project: Project): DebugDuckContext = project.service()
     }
 }

@@ -5,9 +5,7 @@ import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAware
@@ -16,7 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.JBColor
-import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
@@ -49,6 +47,11 @@ import javax.swing.text.DefaultEditorKit
 
 /** The "Debug Duck" tool window: a chat with the duck about the problem the user is stuck on. */
 class DebugDuckToolWindowFactory : ToolWindowFactory, DumbAware {
+    companion object {
+        /** The tool window id from plugin.xml. */
+        const val ID = "DebugDuck"
+    }
+
     override fun shouldBeAvailable(project: Project) = true
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
@@ -86,8 +89,18 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         wrapStyleWord = true
         emptyText.setText(MyMessageBundle.message("debugduck.input.placeholder"))
     }
-    private val attachSelection = JBCheckBox(MyMessageBundle.message("debugduck.attach.selection")).apply {
-        toolTipText = MyMessageBundle.message("debugduck.attach.selection.tooltip")
+    /** What "Ask Debug Duck" or "Attach from editor" picked, with a link to drop it. Hidden when nothing is attached. */
+    private val pendingLabel = JBLabel(AllIcons.FileTypes.Any_type).apply {
+        foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND
+    }
+    private val pendingPanel = JPanel(BorderLayout()).apply {
+        isVisible = false
+        border = JBUI.Borders.emptyBottom(4)
+        add(pendingLabel, BorderLayout.CENTER)
+        add(ActionLink(MyMessageBundle.message("debugduck.pending.remove")) { service.clearPending() }, BorderLayout.EAST)
+    }
+    private val attachLink = ActionLink(MyMessageBundle.message("debugduck.attach")) { attachFromEditor() }.apply {
+        toolTipText = MyMessageBundle.message("debugduck.attach.tooltip")
     }
     private val sendButton = JButton(MyMessageBundle.message("debugduck.send"))
     private val modeLabel = JBLabel().apply {
@@ -101,12 +114,13 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
     init {
         val controls = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.emptyTop(4)
-            add(attachSelection, BorderLayout.WEST)
+            add(attachLink, BorderLayout.WEST)
             add(sendButton, BorderLayout.EAST)
             add(modeLabel, BorderLayout.SOUTH)
         }
         val inputPanel = JPanel(BorderLayout()).apply {
             border = BorderFactory.createCompoundBorder(JBUI.Borders.customLineTop(JBColor.border()), JBUI.Borders.empty(6, 8))
+            add(pendingPanel, BorderLayout.NORTH)
             add(JBScrollPane(input), BorderLayout.CENTER)
             add(controls, BorderLayout.SOUTH)
         }
@@ -132,38 +146,24 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
     }
 
     private fun send() {
-        if (service.state.value.thinking) return
-        // the box stays as the user set it; the same code is attached only once per conversation,
-        // so the chat isn't cluttered and the requests don't grow with every message
-        val attachment = if (attachSelection.isSelected) currentAttachment()?.takeUnless { it.isAlreadySent() } else null
-        if (input.text.isBlank() && attachment?.code == null) return
-        service.send(input.text, attachment, newIdeProblems())
-        input.text = ""
+        if (service.send(input.text, autoProblems())) {
+            input.text = ""
+        }
         input.requestFocusInWindow()
     }
 
-    private fun CodeAttachment.isAlreadySent() = service.state.value.messages.any { it.attachment == this }
-
-    /** Errors from the editor, the last build and the last test run that the duck hasn't seen in this conversation. */
-    private fun newIdeProblems(): List<IdeProblem> {
+    /** Errors from the editor, the last build and the last test run; the service drops the ones already sent. */
+    private fun autoProblems(): List<IdeProblem> {
         if (!DuckSettings.getInstance().state.shareIdeProblems) return emptyList()
         val editor = FileEditorManager.getInstance(project).selectedTextEditor
-        val alreadySent = service.state.value.messages.flatMapTo(HashSet()) { it.problems }
-        return DebugDuckContext.getInstance(project).currentProblems(editor).filterNot { it in alreadySent }
+        return DebugDuckContext.getInstance(project).currentProblems(editor)
     }
 
-    /**
-     * The selection in the active editor, or just the file name if nothing is selected.
-     * `runReadAction` is deprecated in the newest platform versions in favour of `runReadActionBlocking`,
-     * which older versions don't have; this is a tiny read on the EDT either way.
-     */
-    @Suppress("DEPRECATION")
-    private fun currentAttachment(): CodeAttachment? {
-        val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return null
-        return runReadAction {
-            val file = FileDocumentManager.getInstance().getFile(editor.document)
-            CodeAttachment.of(file?.name ?: "untitled", file?.fileType?.name, editor.selectionModel.selectedText)
-        }
+    /** The selection (or the lines around the caret) of the active editor with its errors, like "Ask Debug Duck". */
+    private fun attachFromEditor() {
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return
+        service.attach(DebugDuckContext.getInstance(project).editorContext(editor))
+        input.requestFocusInWindow()
     }
 
     private fun render(state: DebugDuckState) {
@@ -176,11 +176,23 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
         history.background = UIUtil.getPanelBackground()
         history.text = ChatHtml.render(state.messages, state.thinking, palette(), labels)
         sendButton.isEnabled = !state.thinking
+        renderPending(state.pending)
         updateMode()
         SwingUtilities.invokeLater {
             val scrollBar = historyScrollPane.verticalScrollBar
             scrollBar.value = scrollBar.maximum
         }
+    }
+
+    private fun renderPending(pending: PendingContext?) {
+        pendingPanel.isVisible = pending != null
+        if (pending == null) return
+        val what = pending.attachment?.location ?: MyMessageBundle.message("debugduck.pending.errors.only")
+        pendingLabel.text =
+            if (pending.problems.isEmpty()) MyMessageBundle.message("debugduck.pending", what)
+            else MyMessageBundle.message("debugduck.pending.with.errors", what, pending.problems.size)
+        pendingLabel.toolTipText = pending.problems.joinToString("\n") { it.summary }.ifEmpty { null }
+        pendingPanel.revalidate()
     }
 
     private fun updateMode() {

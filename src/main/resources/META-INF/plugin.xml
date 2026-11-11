@@ -42,6 +42,13 @@
         <listener class="ru.itmo.listener.DuckFileDeleteListener" topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"/>
     </applicationListeners>
 
+    <actions>
+        <!-- text and description come from action.CommitDuck.AskDebugDuck.* in MyMessageBundle -->
+        <action id="CommitDuck.AskDebugDuck" class="ru.itmo.debugduck.AskDebugDuckAction" icon="/icons/debugDuck.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+
     <projectListeners>
         <listener class="ru.itmo.listener.DuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
         <listener class="ru.itmo.debugduck.DebugDuckBuildListener" topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
