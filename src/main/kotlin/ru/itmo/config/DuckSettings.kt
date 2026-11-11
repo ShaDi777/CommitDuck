@@ -9,6 +9,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.bindIntValue
+import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -33,6 +34,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var sleepAfterMinutes by property(10)
         var deletedForSeconds by property(5)
         var happyForSeconds by property(5)
+        var quackOnClick by property(true)
     }
 
     fun timeouts() = DuckTimeouts(
@@ -67,6 +69,9 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
             row(MyMessageBundle.message("settings.duck.happy.for")) {
                 spinner(1..60).bindIntValue(options::happyForSeconds)
                 label(MyMessageBundle.message("settings.duck.seconds"))
+            }
+            row {
+                checkBox(MyMessageBundle.message("settings.duck.quack.on.click")).bindSelected(options::quackOnClick)
             }
         }
     }

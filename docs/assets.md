@@ -118,3 +118,19 @@ The status bar widget loads an animation for **every** `PetState` value, so a st
 Sizes are configured in `SIZES` at the top of `tools/sticker_to_sprites.py` (name → frame height in px). For a big duck
 in the tool window, add `"large": 128` and load it with `DuckAnimation.load(state, "large")`. A 128 px state costs about
 3 MB, so keep only the sizes that are actually used.
+
+## Sounds
+
+```
+assets/sounds/<name>.mp3             raw sounds (source of truth, not packaged into the plugin)
+src/main/resources/duck/sounds/      converted WAV files (committed, packaged into the plugin)
+```
+
+Java Sound, which the plugin uses to play sounds (`DuckSound.kt`), can't decode MP3, so convert the sound to 16-bit PCM WAV:
+
+```bash
+ffmpeg -i assets/sounds/quack.mp3 -map_metadata -1 -c:a pcm_s16le src/main/resources/duck/sounds/quack.wav
+```
+
+`quack.wav` plays when the user clicks the duck in the status bar. It can be turned off in
+**Settings → Tools → Commit Duck**.

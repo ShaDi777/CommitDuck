@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.JComponent
 import javax.swing.Timer
 
@@ -75,6 +77,12 @@ private class DuckComponent : JComponent() {
         isOpaque = false
         border = JBUI.Borders.empty(0, 4)
         toolTipText = MyMessageBundle.message("statusbar.duck.name")
+        addMouseListener(object : MouseAdapter() {
+            // mousePressed rather than mouseClicked: a click with a tiny mouse movement still quacks
+            override fun mousePressed(e: MouseEvent) {
+                if (e.button == MouseEvent.BUTTON1) DuckSound.quack()
+            }
+        })
     }
 
     /** Animate only while the widget is actually on screen. */
