@@ -101,6 +101,16 @@ class LocalDebugDuckTest {
     }
 
     @Test
+    fun `skips checklist questions that make no sense for the main problem`() {
+        val replies = listOf("i have CE in line 13") + List(10) { "hmm" }
+        val texts = replies.map { duck.reply(it).text }
+        val irrelevant = DebugPhase.EXPECTED_VS_ACTUAL.questions + DebugPhase.REPRODUCE.questions
+        assertFalse(texts.joinToString("\n"), texts.any { text -> irrelevant.any { text.endsWith(it) } })
+        // "line 13" already answers "where", the rest of the checklist is still asked
+        assertTrue(texts.joinToString("\n"), texts.any { text -> DebugPhase.CHANGES.questions.any { text.endsWith(it) } })
+    }
+
+    @Test
     fun `short keywords match whole words only`() {
         assertTrue(DebugTopic.USER_INTERFACE.matches("the ui is broken"))
         assertFalse(DebugTopic.USER_INTERFACE.matches("the build is broken"))

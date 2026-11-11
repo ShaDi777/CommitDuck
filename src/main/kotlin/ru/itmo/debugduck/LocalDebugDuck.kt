@@ -127,9 +127,11 @@ class LocalDebugDuck(private val random: Random = Random.Default) {
 
     private fun phaseReply(acknowledge: Boolean = true): LocalReply? {
         val phases = DebugPhase.entries
+        // the checklist follows the main problem: no "Can you reproduce it?" for a compile error
+        val irrelevant = mainTopics.flatMapTo(HashSet()) { it.irrelevantPhases }
         while (phaseIndex < phases.size) {
             val phase = phases[phaseIndex++]
-            if (phase in coveredPhases) continue
+            if (phase in coveredPhases || phase in irrelevant) continue
             val question = pickUnasked(phase.questions)
             if (question != null) return LocalReply((if (acknowledge) acknowledge() else "") + question, ReplyKind.PHASE)
         }
@@ -339,7 +341,12 @@ enum class DebugPhase(private val markers: KeywordMatcher, val questions: List<S
  * Well-known kinds of bugs with light hints. Recognised by keywords (English and Russian) in the user's message.
  * The order matters: when a message matches several topics, the more specific one comes first.
  */
-enum class DebugTopic(private val matcher: KeywordMatcher, val hints: List<String>) {
+enum class DebugTopic(
+    private val matcher: KeywordMatcher,
+    val hints: List<String>,
+    /** Checklist steps that make no sense for this kind of problem, e.g. "Can you reproduce it?" for a compile error. */
+    val irrelevantPhases: Set<DebugPhase> = emptySet(),
+) {
     COMPILE_ERROR(
         KeywordMatcher(
             prefixes = listOf(
@@ -354,7 +361,8 @@ enum class DebugTopic(private val matcher: KeywordMatcher, val hints: List<Strin
             "What exactly does the compiler say? Read the message word by word: which symbol, type or token does it complain about?",
             "Look at the line just before the one the compiler points to. A missing semicolon, bracket or quote often shows up a line later.",
             "Do the types fit? Check what each expression on that line returns and what is expected there, and whether everything it uses is declared and imported.",
-        )
+        ),
+        irrelevantPhases = setOf(DebugPhase.EXPECTED_VS_ACTUAL, DebugPhase.REPRODUCE),
     ),
     NULL_VALUE(
         KeywordMatcher(
@@ -426,7 +434,8 @@ enum class DebugTopic(private val matcher: KeywordMatcher, val hints: List<Strin
             "What is the very first error in the build output? Later errors are often just consequences of the first one.",
             "Did dependencies or their versions change recently? Does a clean build behave the same way?",
             "Does it build from the command line but not in the IDE, or the other way around? That points to configuration rather than code.",
-        )
+        ),
+        irrelevantPhases = setOf(DebugPhase.EXPECTED_VS_ACTUAL),
     ),
     PERFORMANCE(
         KeywordMatcher(
