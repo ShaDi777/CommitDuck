@@ -8,6 +8,8 @@
     <description><![CDATA[
         Commit Duck is a virtual duck companion for JetBrains IDEs that reacts to your coding activity.
         It cheers you on while you work and dozes off when you take a break.
+        When you are stuck, talk the problem through with the Debug Duck: it asks leading questions,
+        either from a built-in set or with the help of a language model of your choice.
         ]]></description>
 
     <!-- Product and plugin compatibility requirements.
@@ -23,10 +25,11 @@
         <!-- If the plugin is published on JetBrains Marketplace, errors reported by users are available on the plugin page.
              See https://plugins.jetbrains.com/docs/marketplace/error-handler.html#developers-side for details. -->
         <errorHandler implementation="com.intellij.diagnostic.JetBrainsMarketplaceErrorReportSubmitter"/>
-        <toolWindow id="MyToolWindow" factoryClass="ru.itmo.ui.MyToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
         <toolWindow id="Duck" factoryClass="ru.itmo.ui.DuckToolWindowFactory"
                     icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+        <!-- Debug Duck chat; the title comes from toolwindow.stripe.DebugDuck in MyMessageBundle -->
+        <toolWindow id="DebugDuck" factoryClass="ru.itmo.debugduck.DebugDuckToolWindowFactory"
+                    anchor="right" icon="/icons/debugDuck.svg"/>
         <statusBarWidgetFactory id="CommitDuck" implementation="ru.itmo.ui.DuckStatusBarWidgetFactory"/>
         <applicationConfigurable parentId="tools" instance="ru.itmo.config.DuckConfigurable"
                                  id="ru.itmo.commit-duck.settings" key="settings.duck.name"/>
