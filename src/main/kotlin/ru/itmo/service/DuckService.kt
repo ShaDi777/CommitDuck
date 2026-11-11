@@ -46,6 +46,8 @@ class DuckService(scope: CoroutineScope) {
                         // keep showing the reaction until it is over
                         model.state.type == PetStateType.HAPPY -> {}
                         // sleep takes priority over idling
+                        model.state.type != PetStateType.SAD && quietFor >= timeouts.sadAfter ->
+                            model.handle(Event.IdleExtended)
                         model.state.type != PetStateType.SLEEPING && quietFor >= timeouts.sleepAfter ->
                             model.handle(Event.Sleep)
                         model.state.type == PetStateType.WORKING && quietFor >= timeouts.idleAfter ->

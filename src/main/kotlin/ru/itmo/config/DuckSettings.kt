@@ -17,6 +17,8 @@ import kotlin.time.Duration.Companion.seconds
 data class DuckTimeouts(
     /** No activity for this long: [PetStateType.WORKING] -> [PetStateType.IDLE]. */
     val idleAfter: Duration,
+    /** No activity for this long: any state -> [PetStateType.SAD]. */
+    val sadAfter: Duration,
     /** No activity for this long: any state -> [PetStateType.SLEEPING]. */
     val sleepAfter: Duration,
     /** How long the duck shows [PetStateType.DELETED] after the user deletes files. */
@@ -30,6 +32,7 @@ data class DuckTimeouts(
 class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Options()) {
     class Options : BaseState() {
         var idleAfterSeconds by property(30)
+        var sadAfterSeconds by property(60)
         var sleepAfterMinutes by property(10)
         var deletedForSeconds by property(5)
         var happyForSeconds by property(5)
@@ -37,6 +40,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
 
     fun timeouts() = DuckTimeouts(
         idleAfter = state.idleAfterSeconds.seconds,
+        sadAfter = state.sadAfterSeconds.seconds,
         sleepAfter = state.sleepAfterMinutes.minutes,
         deletedFor = state.deletedForSeconds.seconds,
         happyFor = state.happyForSeconds.seconds,
@@ -54,6 +58,10 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
         return panel {
             row(MyMessageBundle.message("settings.duck.idle.after")) {
                 spinner(1..3600).bindIntValue(options::idleAfterSeconds)
+                label(MyMessageBundle.message("settings.duck.seconds"))
+            }
+            row(MyMessageBundle.message("settings.duck.sad.after")) {
+                spinner(1..3600).bindIntValue(options::sadAfterSeconds)
                 label(MyMessageBundle.message("settings.duck.seconds"))
             }
             row(MyMessageBundle.message("settings.duck.sleep.after")) {
