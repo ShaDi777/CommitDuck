@@ -7,6 +7,8 @@ package ru.itmo.pet
  * sprite) without touching the rest of the pet logic.
  */
 enum class PetStateType(val displayName: String) {
+    FIRST_LAUNCH("First launch"),
+    GREETING("Greeting"),
     IDLE("Idle"),
     WORKING("Working"),
     SLEEPING("Sleeping"),

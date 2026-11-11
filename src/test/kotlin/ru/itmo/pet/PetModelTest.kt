@@ -2,14 +2,14 @@ package ru.itmo.pet
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import ru.itmo.pet.states.IdleState
+import ru.itmo.pet.states.GreetingState
 
 class PetModelTest {
-    private val model = PetModel(IdleState())
+    private val model = PetModel(GreetingState())
 
     @Test
     fun `starts idle`() {
-        assertEquals(PetStateType.IDLE, model.state.type)
+        assertEquals(PetStateType.GREETING, model.state.type)
     }
 
     @Test

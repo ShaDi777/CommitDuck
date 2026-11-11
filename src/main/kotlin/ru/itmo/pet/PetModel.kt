@@ -1,6 +1,6 @@
 package ru.itmo.pet
 
-import ru.itmo.pet.states.IdleState
+import ru.itmo.pet.states.GreetingState
 import ru.itmo.pet.states.PetState
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -10,7 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * - [handle] feeds incoming signals to the current [PetState], which decides the next one.
  * - [addListener] lets the UI subscribe and re-render whenever the state changes.
  */
-class PetModel(initialState: PetState = IdleState()) {
+class PetModel(initialState: PetState = GreetingState()) {
 
     var state: PetState = initialState
         private set

@@ -36,6 +36,7 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         var sleepAfterMinutes by property(10)
         var deletedForSeconds by property(5)
         var happyForSeconds by property(5)
+        var isFirstLaunch by property(true)
     }
 
     fun timeouts() = DuckTimeouts(
@@ -45,6 +46,12 @@ class DuckSettings : SimplePersistentStateComponent<DuckSettings.Options>(Option
         deletedFor = state.deletedForSeconds.seconds,
         happyFor = state.happyForSeconds.seconds,
     )
+
+    fun isFirstLaunch() = state.isFirstLaunch
+
+    fun markLaunched() {
+        state.isFirstLaunch = false
+    }
 
     companion object {
         fun getInstance(): DuckSettings = service()
