@@ -20,6 +20,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.ui.JBIntSpinner
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.Cell
@@ -47,14 +48,14 @@ data class DuckTimeouts(
     val happyFor: Duration,
 )
 
-/** Which language the Debug Duck speaks. */
+/** Which language the Debug Duck speaks. Stored by name, so don't override `toString` (the XML serializer uses it). */
 enum class DuckLanguageSetting(private val titleKey: String) {
     AUTO("settings.duck.language.auto"),
     ENGLISH("settings.duck.language.english"),
     RUSSIAN("settings.duck.language.russian");
 
-    // shown by the combo box
-    override fun toString(): String = MyMessageBundle.message(titleKey)
+    val title: String
+        get() = MyMessageBundle.message(titleKey)
 }
 
 @Service(Service.Level.APP)
@@ -164,7 +165,7 @@ class DuckConfigurable : BoundConfigurable(MyMessageBundle.message("settings.duc
 
             group(MyMessageBundle.message("settings.duck.llm.group")) {
                 row(MyMessageBundle.message("settings.duck.language")) {
-                    comboBox(DuckLanguageSetting.entries)
+                    comboBox(DuckLanguageSetting.entries, SimpleListCellRenderer.create<DuckLanguageSetting?>("") { it?.title ?: "" })
                         .bindItem({ options.duckLanguage }, { options.duckLanguage = it ?: DuckLanguageSetting.AUTO })
                 }
                 row {

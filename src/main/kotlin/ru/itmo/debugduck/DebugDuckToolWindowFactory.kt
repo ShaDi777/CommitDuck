@@ -168,7 +168,9 @@ private class DebugDuckPanel(private val project: Project, parentDisposable: Dis
     }
 
     private fun send() {
-        if (service.state.value.thinking || !confirmSendingToLlm()) return
+        val state = service.state.value
+        if (state.thinking || input.text.isBlank() && state.pending == null) return
+        if (!confirmSendingToLlm()) return
         if (service.send(input.text, autoProblems())) {
             input.text = ""
         }
