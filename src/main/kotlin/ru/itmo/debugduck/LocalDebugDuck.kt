@@ -46,12 +46,8 @@ class LocalDebugDuck(
     fun greeting(): LocalReply = LocalReply(t(GREETINGS.random(random)), ReplyKind.GREETING)
 
     fun reply(userText: String, attachment: CodeAttachment? = null, problems: List<IdeProblem> = emptyList()): LocalReply {
-        if (fixedLanguage == null) DuckLanguage.detect(userText)?.let { language = it }
+        val mentionedTopics = observe(userText, problems)
         val text = userText.lowercase()
-        DebugPhase.entries.filterTo(coveredPhases) { it.isAnsweredBy(text) }
-        val problemTopics = topicsOf(problems)
-        val mentionedTopics = DebugTopic.entries.filter { it in problemTopics || it.matches(text) }
-        if (mainTopics.isEmpty()) mainTopics += mentionedTopics
         val reply = solvedReply(text)
             ?: thanksReply(text)
             ?: problemReply(problems, mentionedTopics)
@@ -62,6 +58,35 @@ class LocalDebugDuck(
             ?: genericReply()
         lastKind = reply.kind
         return reply
+    }
+
+    /**
+     * Picks up a conversation restored after an IDE restart: what the user said and which questions were asked,
+     * so the duck neither repeats itself nor forgets the main problem.
+     */
+    fun restore(history: List<ChatMessage>) {
+        reset()
+        for (message in history) {
+            when (message.role) {
+                ChatRole.USER -> observe(message.text, message.problems)
+                ChatRole.DUCK -> allPhrases().filterTo(asked) { phrase ->
+                    phrase in message.text || RussianPhrases.byEnglish[phrase]?.let { it in message.text } == true
+                }
+                ChatRole.NOTICE -> {}
+            }
+        }
+        phaseIndex = DebugPhase.entries.indexOfLast { phase -> phase.questions.any { it in asked } } + 1
+    }
+
+    /** Takes in what the user said: language, checklist steps already answered, topics. Returns the topics. */
+    private fun observe(userText: String, problems: List<IdeProblem>): List<DebugTopic> {
+        if (fixedLanguage == null) DuckLanguage.detect(userText)?.let { language = it }
+        val text = userText.lowercase()
+        DebugPhase.entries.filterTo(coveredPhases) { it.isAnsweredBy(text) }
+        val problemTopics = topicsOf(problems)
+        val mentionedTopics = DebugTopic.entries.filter { it in problemTopics || it.matches(text) }
+        if (mainTopics.isEmpty()) mainTopics += mentionedTopics
+        return mentionedTopics
     }
 
     /** A congratulation in the current language, e.g. when the user marks the problem as solved. */

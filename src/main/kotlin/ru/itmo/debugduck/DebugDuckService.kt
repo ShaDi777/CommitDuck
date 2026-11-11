@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
@@ -49,13 +52,31 @@ data class DebugDuckState(
  * and the conversation continues with a built-in question.
  */
 @Service(Service.Level.PROJECT)
-class DebugDuckService(@Suppress("unused") private val project: Project, private val scope: CoroutineScope) {
+class DebugDuckService(project: Project, private val scope: CoroutineScope) {
     private val localDuck = LocalDebugDuck(language = DuckSettings.getInstance().initialDuckLanguage)
     private val llmClient = OpenAiCompatibleClient()
-    private val mutableState = MutableStateFlow(DebugDuckState(listOf(greeting())))
+    private val history = DebugDuckHistory.getInstance(project)
+    private val mutableState = MutableStateFlow(restoreOrGreet())
     private var answerJob: Job? = null
 
     val state: StateFlow<DebugDuckState> = mutableState.asStateFlow()
+
+    init {
+        // keep the conversation between IDE restarts; the streamed part of an answer is not saved, only messages
+        scope.launch {
+            state.map { StoredConversation(it.messages, it.solved) }.distinctUntilChanged().drop(1).collect { history.save(it) }
+        }
+    }
+
+    /** The conversation from the last session, or a new one with a greeting. */
+    private fun restoreOrGreet(): DebugDuckState {
+        val stored = history.load() ?: return DebugDuckState(listOf(greeting()))
+        synchronized(localDuck) {
+            localDuck.fixedLanguage = DuckSettings.getInstance().fixedDuckLanguage
+            localDuck.restore(stored.messages)
+        }
+        return DebugDuckState(stored.messages, solved = stored.solved)
+    }
 
     /** Calls [listener] on the EDT with the current state and every change, until [disposable] is disposed. */
     fun subscribe(disposable: Disposable, listener: (DebugDuckState) -> Unit) = subscribe(state, disposable, listener)
@@ -150,6 +171,7 @@ class DebugDuckService(@Suppress("unused") private val project: Project, private
         synchronized(localDuck) { localDuck.reset() }
         // what the user just attached stays: they probably want to ask about it in the new conversation
         mutableState.update { DebugDuckState(listOf(greeting()), conversationId = it.conversationId + 1, pending = it.pending) }
+        // the old conversation is forgotten for good: the saved copy is replaced by the collector in init
     }
 
     /** E.g. "Mode: language model (gpt-5-mini) · Solved with the duck: 3", shown in the tool window. */
