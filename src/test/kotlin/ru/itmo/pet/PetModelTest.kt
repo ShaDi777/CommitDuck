@@ -2,14 +2,60 @@ package ru.itmo.pet
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import ru.itmo.pet.states.GreetingState
+import ru.itmo.pet.states.IdleState
 
 class PetModelTest {
-    private val model = PetModel(GreetingState())
+    // the behaviour below starts from an idle duck; the greeting has its own tests
+    private val model = PetModel(IdleState())
 
     @Test
     fun `starts idle`() {
-        assertEquals(PetStateType.GREETING, model.state.type)
+        assertEquals(PetStateType.IDLE, model.state.type)
+    }
+
+    @Test
+    fun `a new duck greets the user`() {
+        assertEquals(PetStateType.GREETING, PetModel().state.type)
+    }
+
+    @Test
+    fun `the greeting is over on wake up`() {
+        val greeting = PetModel()
+        greeting.handle(Event.WakeUp)
+        assertEquals(PetStateType.IDLE, greeting.state.type)
+    }
+
+    @Test
+    fun `typing during the greeting puts the duck to work`() {
+        val greeting = PetModel()
+        greeting.handle(Event.Activity())
+        assertEquals(PetStateType.WORKING, greeting.state.type)
+    }
+
+    @Test
+    fun `a duck that keeps greeting can still fall asleep`() {
+        val greeting = PetModel()
+        greeting.handle(Event.Sleep)
+        assertEquals(PetStateType.SLEEPING, greeting.state.type)
+    }
+
+    @Test
+    fun `the first launch welcome is over on wake up`() {
+        val firstLaunch = PetModel()
+        firstLaunch.handle(Event.FirstLaunch)
+        assertEquals(PetStateType.FIRST_LAUNCH, firstLaunch.state.type)
+        firstLaunch.handle(Event.WakeUp)
+        assertEquals(PetStateType.IDLE, firstLaunch.state.type)
+    }
+
+    @Test
+    fun `a reaction during the greeting returns to the greeting, which then ends`() {
+        val greeting = PetModel()
+        greeting.handle(Event.Deleted)
+        greeting.handle(Event.WakeUp)
+        assertEquals(PetStateType.GREETING, greeting.state.type)
+        greeting.handle(Event.WakeUp)
+        assertEquals(PetStateType.IDLE, greeting.state.type)
     }
 
     @Test
